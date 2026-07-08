@@ -62,6 +62,45 @@ export function formatLong(isoDate: string): string {
   });
 }
 
+/**
+ * Whole-day difference (b − a) between two YYYY-MM-DD strings.
+ *
+ * Uses Date.UTC so the arithmetic is anchored to UTC midnight and cannot be
+ * perturbed by a daylight-saving-time transition between the two dates (a
+ * local-time subtraction can land on 23h or 25h and, after rounding, shift the
+ * day count by one near DST boundaries). Since we only compare calendar dates,
+ * UTC anchoring is exact.
+ */
+export function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  const aMs = Date.UTC(ay, am - 1, ad);
+  const bMs = Date.UTC(by, bm - 1, bd);
+  return Math.round((bMs - aMs) / 86_400_000);
+}
+
+/** Add `n` days to a YYYY-MM-DD string, returning YYYY-MM-DD (local calendar). */
+export function addDaysISO(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return toISODate(new Date(y, m - 1, d + n));
+}
+
+/** Add `n` calendar months to a YYYY-MM-DD string. Clamps overflowing days to
+ *  the last valid day of the target month (e.g. Jan 31 +1mo → Feb 28/29). */
+export function addMonthsISO(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const targetMonthIndex0 = m - 1 + n;
+  const targetYear = y + Math.floor(targetMonthIndex0 / 12);
+  const normMonth = ((targetMonthIndex0 % 12) + 12) % 12;
+  const lastDay = new Date(targetYear, normMonth + 1, 0).getDate();
+  return buildISODate(targetYear, normMonth, Math.min(d, lastDay));
+}
+
+/** Add `n` years to a YYYY-MM-DD string. Clamps Feb 29 → Feb 28 in non-leap years. */
+export function addYearsISO(iso: string, n: number): string {
+  return addMonthsISO(iso, n * 12);
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Range helpers (used by bulk delete). All return ISO YYYY-MM-DD strings,
 // inclusive of both endpoints.

@@ -1,16 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Plus, Trash2, Save, Pencil, Bell, BellOff } from "lucide-react";
-import { CATEGORIES, CATEGORY_LIST, type CalendarEvent, type CategoryId } from "@/lib/types";
+import { X, Plus, Trash2, Save, Pencil, Bell, BellOff, Repeat } from "lucide-react";
+import {
+  CATEGORIES,
+  CATEGORY_LIST,
+  RECURRENCE_LABELS,
+  type CalendarEvent,
+  type CategoryId,
+  type RecurrenceFreq,
+} from "@/lib/types";
 import { formatLong } from "@/lib/date-utils";
 import { LEAD_TIME_OPTIONS } from "@/lib/useReminders";
+import { ConfirmDialog } from "./ConfirmDialog";
+
+/** Draft shape produced by the form — id and updatedAt are assigned by the store. */
+type EventDraft = Omit<CalendarEvent, "id" | "updatedAt">;
 
 interface Props {
   date: string; // ISO YYYY-MM-DD
   events: CalendarEvent[];
   onClose: () => void;
-  onAdd: (draft: Omit<CalendarEvent, "id">) => void;
+  onAdd: (draft: EventDraft) => void;
   onUpdate: (id: string, updates: Partial<Omit<CalendarEvent, "id">>) => void;
   onDelete: (id: string) => void;
   onToggleComplete: (id: string) => void;
@@ -19,20 +30,22 @@ interface Props {
 export function DayDrawer({ date, events, onClose, onAdd, onUpdate, onDelete, onToggleComplete }: Props) {
   const [composing, setComposing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<CalendarEvent | null>(null);
 
-  // Close on Escape.
+  // Close on Escape (unless a nested confirm is open, which handles its own Esc).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !pendingDelete) onClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, pendingDelete]);
 
   // Reset transient UI state when the drawer is opened on a different date.
   useEffect(() => {
     setComposing(false);
     setEditingId(null);
+    setPendingDelete(null);
   }, [date]);
 
   return (
@@ -82,9 +95,7 @@ export function DayDrawer({ date, events, onClose, onAdd, onUpdate, onDelete, on
                 key={event.id}
                 event={event}
                 onEdit={() => setEditingId(event.id)}
-                onDelete={() => {
-                  if (confirm(`Delete "${event.title}"?`)) onDelete(event.id);
-                }}
+                onDelete={() => setPendingDelete(event)}
                 onToggleComplete={() => onToggleComplete(event.id)}
               />
             )
@@ -110,6 +121,23 @@ export function DayDrawer({ date, events, onClose, onAdd, onUpdate, onDelete, on
           )}
         </div>
       </aside>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete event?"
+          message={
+            `Delete "${pendingDelete.title}"?` +
+            (pendingDelete.recurrence ? "\nThis deletes the entire recurring series." : "")
+          }
+          confirmLabel="Delete"
+          destructive
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => {
+            onDelete(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -159,6 +187,15 @@ function EventCard({
             >
               {event.title}
             </h3>
+            {event.recurrence && (
+              <span
+                className="inline-flex shrink-0 items-center gap-0.5 rounded-sm bg-neutral-100 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wider text-neutral-500"
+                title={`Repeats ${RECURRENCE_LABELS[event.recurrence.freq]}`}
+              >
+                <Repeat className="h-2.5 w-2.5" />
+                {RECURRENCE_LABELS[event.recurrence.freq]}
+              </span>
+            )}
           </div>
           {event.description && (
             <p
@@ -240,7 +277,7 @@ function EventForm({
 }: {
   initial?: CalendarEvent;
   date: string;
-  onSubmit: (draft: Omit<CalendarEvent, "id">) => void;
+  onSubmit: (draft: EventDraft) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -248,6 +285,10 @@ function EventForm({
   const [category, setCategory] = useState<CategoryId>(initial?.category ?? "REMINDER");
   const [eventDate, setEventDate] = useState<string>(initial?.date ?? date);
   const [completed, setCompleted] = useState<boolean>(initial?.completed ?? false);
+
+  // Recurrence. "" = does not repeat; otherwise a RecurrenceFreq. `until` optional.
+  const [recurFreq, setRecurFreq] = useState<RecurrenceFreq | "">(initial?.recurrence?.freq ?? "");
+  const [recurUntil, setRecurUntil] = useState<string>(initial?.recurrence?.until ?? "");
 
   // Reminder customization. Three modes:
   //   "default" → reminderDays === undefined (use global defaults if category eligible)
@@ -273,6 +314,9 @@ function EventForm({
         : reminderMode === "none"
           ? []
           : [...customDays].sort((a, b) => b - a);
+    const recurrence = recurFreq
+      ? { freq: recurFreq, until: recurUntil || undefined }
+      : undefined;
     onSubmit({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -280,6 +324,10 @@ function EventForm({
       date: eventDate,
       completed,
       reminderDays,
+      recurrence,
+      // Preserve per-occurrence completion when editing; drop it if recurrence
+      // was turned off.
+      completedDates: recurrence ? initial?.completedDates : undefined,
     });
   };
 
@@ -342,6 +390,37 @@ function EventForm({
             className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
           />
         </label>
+
+        {/* Recurrence */}
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Repeats</span>
+            <select
+              value={recurFreq}
+              onChange={(e) => setRecurFreq(e.target.value as RecurrenceFreq | "")}
+              className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+            >
+              <option value="">Does not repeat</option>
+              {(Object.keys(RECURRENCE_LABELS) as RecurrenceFreq[]).map((f) => (
+                <option key={f} value={f}>
+                  {RECURRENCE_LABELS[f]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {recurFreq && (
+            <label className="block">
+              <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Until (optional)</span>
+              <input
+                type="date"
+                value={recurUntil}
+                min={eventDate}
+                onChange={(e) => setRecurUntil(e.target.value)}
+                className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+              />
+            </label>
+          )}
+        </div>
 
         {/* Per-event reminders */}
         <div>

@@ -11,6 +11,7 @@ import { DayDrawer } from "@/components/DayDrawer";
 import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
 import { BackupMenu } from "@/components/BackupMenu";
 import { RemindersToggle } from "@/components/RemindersToggle";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // 4-year window starting from "now" (the year of today). Recomputed at module
 // load — fine for an SPA-style app; if you want it strictly relative to the
@@ -25,6 +26,7 @@ export default function HomePage() {
   const [year, setYear] = useState<number>(START_YEAR);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   // Scroll today's cell into view once, after first hydration, but only when
   // we're on the year that actually contains today.
@@ -85,11 +87,7 @@ export default function HomePage() {
             Bulk delete
           </button>
           <button
-            onClick={() => {
-              if (confirm("Reset to seed events? This will lose any changes you've made.")) {
-                ev.resetToSeed();
-              }
-            }}
+            onClick={() => setResetConfirmOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
             title="Reset to the original seeded events"
           >
@@ -157,6 +155,21 @@ export default function HomePage() {
           onConfirm={(predicate) => {
             ev.deleteMany(predicate);
             setBulkDeleteOpen(false);
+          }}
+        />
+      )}
+
+      {/* Reset confirmation */}
+      {resetConfirmOpen && (
+        <ConfirmDialog
+          title="Reset to seed events?"
+          message={"This discards every change you've made and restores the original seeded events.\nThis cannot be undone."}
+          confirmLabel="Reset"
+          destructive
+          onCancel={() => setResetConfirmOpen(false)}
+          onConfirm={() => {
+            ev.resetToSeed();
+            setResetConfirmOpen(false);
           }}
         />
       )}

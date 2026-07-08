@@ -37,9 +37,19 @@ export const CATEGORY_LIST: CategoryMeta[] = Object.values(CATEGORIES).sort(
   (a, b) => a.priority - b.priority
 );
 
+/** How an event repeats. `freq` is the cadence; `until` (inclusive, YYYY-MM-DD)
+ *  optionally caps the series. `SEMESTER` = every 6 months from the base date. */
+export type RecurrenceFreq = "WEEKLY" | "MONTHLY" | "YEARLY" | "SEMESTER";
+
+export interface Recurrence {
+  freq: RecurrenceFreq;
+  /** Inclusive last date the series may produce an occurrence (YYYY-MM-DD). */
+  until?: string;
+}
+
 export interface CalendarEvent {
   id: string;
-  /** ISO date YYYY-MM-DD. */
+  /** ISO date YYYY-MM-DD. For a recurring event this is the FIRST occurrence. */
   date: string;
   category: CategoryId;
   title: string;
@@ -51,4 +61,22 @@ export interface CalendarEvent {
    *  - `[]` → never fire reminders for this event.
    *  - `[14, 3]` → fire reminders 14 and 3 days before, regardless of category. */
   reminderDays?: number[];
+  /** ISO timestamp of the last edit. Drives newest-wins merge during sync.
+   *  Always present from schema v2 onward; migration backfills it. */
+  updatedAt: string;
+  /** Optional repeat rule. When set, `date` is the first occurrence and further
+   *  occurrences are expanded at render time (see lib/recurrence.ts). */
+  recurrence?: Recurrence;
+  /** For a recurring series: ISO dates of occurrences the user marked done.
+   *  The base event's own `completed` flag governs the FIRST occurrence only
+   *  when there's no recurrence; with a recurrence, per-occurrence completion
+   *  lives here (keyed by the occurrence's YYYY-MM-DD). */
+  completedDates?: string[];
 }
+
+export const RECURRENCE_LABELS: Record<RecurrenceFreq, string> = {
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+  SEMESTER: "Every semester (6 mo)",
+  YEARLY: "Yearly",
+};

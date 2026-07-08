@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { CalendarEvent, CategoryId } from "./types";
-import { todayISO } from "./date-utils";
+import { todayISO, daysBetween, addDaysISO } from "./date-utils";
+import { expandEvent } from "./recurrence";
 
 const PREF_KEY = "yearly-calendar:reminders:v1";
 const SHOWN_KEY = "yearly-calendar:reminders:shown:v1";
@@ -18,13 +19,9 @@ export const LEAD_TIME_OPTIONS = [60, 30, 14, 7, 3, 1, 0];
 
 const SWEEP_INTERVAL_MS = 60_000;
 
-function daysBetween(a: string, b: string): number {
-  const [ay, am, ad] = a.split("-").map(Number);
-  const [by, bm, bd] = b.split("-").map(Number);
-  const aMs = new Date(ay, am - 1, ad).getTime();
-  const bMs = new Date(by, bm - 1, bd).getTime();
-  return Math.round((bMs - aMs) / 86_400_000);
-}
+// Look-ahead window for expanding recurring events when sweeping for reminders.
+// The longest default/optional lead time is 60 days, so 70 gives comfortable margin.
+const REMINDER_LOOKAHEAD_DAYS = 70;
 
 /** Resolve the lead-time list for one event. null = no reminders for this event. */
 function resolveLeadTimes(event: CalendarEvent): number[] | null {
@@ -85,34 +82,44 @@ export function useReminders(events: CalendarEvent[], hydrated: boolean) {
       shown = {};
     }
 
+    const windowEnd = addDaysISO(today, REMINDER_LOOKAHEAD_DAYS);
+
     let changed = false;
     for (const event of events) {
-      if (event.completed) continue;
       const leadTimes = resolveLeadTimes(event);
       if (!leadTimes) continue;
 
-      const days = daysBetween(today, event.date);
-      if (!leadTimes.includes(days)) continue;
+      // Expand recurring events into upcoming occurrences; a non-recurring event
+      // yields at most one. Only occurrences from today forward can fire.
+      const occurrences = expandEvent(event, today, windowEnd);
+      for (const occ of occurrences) {
+        if (occ.completed) continue;
 
-      const key = `${event.id}:${days}`;
-      if (shown[key] === today) continue;
+        const days = daysBetween(today, occ.date);
+        if (!leadTimes.includes(days)) continue;
 
-      const title =
-        days === 0
-          ? `Today: ${event.title}`
-          : `${event.title} — in ${days} day${days === 1 ? "" : "s"}`;
-      const body = event.description?.slice(0, 200) || `${event.category} on ${event.date}`;
-      try {
-        const n = new Notification(title, { body, tag: key });
-        n.onclick = () => {
-          window.focus();
-          n.close();
-        };
-      } catch (err) {
-        console.warn("Notification failed:", err);
+        // Key includes the occurrence date so distinct occurrences of a series
+        // are tracked independently.
+        const key = `${event.id}:${occ.date}:${days}`;
+        if (shown[key] === today) continue;
+
+        const title =
+          days === 0
+            ? `Today: ${event.title}`
+            : `${event.title} — in ${days} day${days === 1 ? "" : "s"}`;
+        const body = event.description?.slice(0, 200) || `${event.category} on ${occ.date}`;
+        try {
+          const n = new Notification(title, { body, tag: key });
+          n.onclick = () => {
+            window.focus();
+            n.close();
+          };
+        } catch (err) {
+          console.warn("Notification failed:", err);
+        }
+        shown[key] = today;
+        changed = true;
       }
-      shown[key] = today;
-      changed = true;
     }
 
     if (changed) {

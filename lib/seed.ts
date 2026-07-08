@@ -1,11 +1,15 @@
 import type { CalendarEvent } from "./types";
 
+/** Seed events omit `updatedAt` (it's stamped at load time by useEvents via
+ *  `withStamp`), so they're typed as CalendarEvent minus that field. */
+export type SeedEvent = Omit<CalendarEvent, "updatedAt">;
+
 /**
  * Initial events. Mirrors the planning data from the LaTeX calendar so a fresh
  * install isn't an empty grid. Users can add/remove freely; their changes
  * persist to localStorage and override these defaults.
  */
-export const SEED_EVENTS: CalendarEvent[] = [
+export const SEED_EVENTS: SeedEvent[] = [
   // ---- May 2026 ----
   { id: "seed-001", date: "2026-05-08", category: "MILESTONE", title: "Calendar starts (today)", description: "Master calendar starting point.", completed: false },
   { id: "seed-002", date: "2026-05-18", category: "REMINDER",  title: "Confirm summer plans", description: "Lock down housing, start dates, paperwork for whatever Summer 2026 placement you landed.", completed: false },

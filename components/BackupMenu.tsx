@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Database, Download, Upload, ChevronDown, X, AlertTriangle, FileJson } from "lucide-react";
-import type { CalendarEvent, CategoryId } from "@/lib/types";
-import { CATEGORIES } from "@/lib/types";
+import type { CalendarEvent } from "@/lib/types";
+import { validateEvents } from "@/lib/validation";
 
 const BACKUP_FORMAT = "yearly-calendar-backup";
 const BACKUP_VERSION = 1;
@@ -72,7 +72,7 @@ export function BackupMenu({ events, onReplace, onMerge }: Props) {
     try {
       const text = await file.text();
       const obj = JSON.parse(text);
-      const importedEvents = validateBackup(obj);
+      const importedEvents = validateEvents(obj, new Date().toISOString());
       const exportedAt = obj?.exportedAt as string | undefined;
       setParsed({ events: importedEvents, exportedAt });
     } catch (err) {
@@ -153,53 +153,6 @@ export function BackupMenu({ events, onReplace, onMerge }: Props) {
       )}
     </div>
   );
-}
-
-// ──────────────────────────────────────────────────────────────────────────
-// Validation
-// ──────────────────────────────────────────────────────────────────────────
-
-const VALID_CATS = new Set(Object.keys(CATEGORIES));
-
-function validateBackup(obj: unknown): CalendarEvent[] {
-  // Accept either our wrapped {format,version,events} or a bare array of events.
-  let rawEvents: unknown;
-  if (Array.isArray(obj)) {
-    rawEvents = obj;
-  } else if (obj && typeof obj === "object" && Array.isArray((obj as BackupFile).events)) {
-    rawEvents = (obj as BackupFile).events;
-  } else {
-    throw new Error("File doesn't look like a backup — expected an events array or a backup object.");
-  }
-
-  const arr = rawEvents as unknown[];
-  const out: CalendarEvent[] = [];
-  for (let i = 0; i < arr.length; i++) {
-    const e = arr[i] as Partial<CalendarEvent> | null;
-    if (!e || typeof e !== "object") {
-      throw new Error(`Event at index ${i} is not an object.`);
-    }
-    if (typeof e.id !== "string" || !e.id) throw new Error(`Event ${i}: missing 'id'.`);
-    if (typeof e.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
-      throw new Error(`Event ${i} (${e.id}): invalid 'date' (expected YYYY-MM-DD).`);
-    }
-    if (typeof e.title !== "string" || !e.title) throw new Error(`Event ${i} (${e.id}): missing 'title'.`);
-    if (typeof e.category !== "string" || !VALID_CATS.has(e.category)) {
-      throw new Error(`Event ${i} (${e.id}): unknown category '${e.category}'.`);
-    }
-    out.push({
-      id: e.id,
-      date: e.date,
-      title: e.title,
-      category: e.category as CategoryId,
-      description: typeof e.description === "string" ? e.description : undefined,
-      completed: Boolean(e.completed),
-      reminderDays: Array.isArray(e.reminderDays)
-        ? e.reminderDays.filter((d): d is number => typeof d === "number" && d >= 0)
-        : undefined,
-    });
-  }
-  return out;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -302,29 +255,13 @@ function RestoreConfirmDialog({
             Cancel
           </button>
           <button
-            onClick={() => {
-              if (
-                confirm(
-                  `Merge ${imported.length} event${imported.length === 1 ? "" : "s"} into your calendar?`
-                )
-              ) {
-                onMerge();
-              }
-            }}
+            onClick={onMerge}
             className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
           >
             Merge
           </button>
           <button
-            onClick={() => {
-              if (
-                confirm(
-                  `Replace your current ${currentCount} event${currentCount === 1 ? "" : "s"} with the ${imported.length} from the file?\n\nThis cannot be undone.`
-                )
-              ) {
-                onReplace();
-              }
-            }}
+            onClick={onReplace}
             className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
           >
             Replace
