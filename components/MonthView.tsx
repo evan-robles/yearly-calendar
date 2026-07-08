@@ -5,10 +5,6 @@ import type { Label } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
 import { MONTH_NAMES, DAY_HEADERS_MON_FIRST, monthGrid, buildISODate } from "@/lib/date-utils";
 
-// How many events show as full text chips before the rest collapse to compact
-// colored dots. 1 = show the top-priority event, everything else as dots.
-const MAX_CHIPS = 1;
-
 interface MonthProps {
   year: number;
   monthIndex: number;
@@ -110,61 +106,55 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
                 {hasLink && <Link2 className="h-2.5 w-2.5 text-muted" />}
               </div>
 
-              {/* Show the top-priority event as a full chip; every additional
-                  event collapses to a tiny label-colored dot (hollow when done)
-                  with a count, so busy days stay compact and countable. */}
+              {/* One event → a full text chip. Two or more → compact colored
+                  dots only (one per event, colored by label, hollow when done)
+                  plus a count, so busy days never overflow the cell. */}
               {(() => {
-                // Sort by label priority (lower = more important) so the chip and
-                // the leading dots reflect importance.
+                // Sort by label priority (lower = more important).
                 const ordered = [...occs].sort(
                   (a, b) => getLabel(a.event.category).priority - getLabel(b.event.category).priority
                 );
-                const chips = ordered.slice(0, MAX_CHIPS);
-                const dots = ordered.slice(MAX_CHIPS);
-                return (
-                  <>
+                if (ordered.length === 1) {
+                  const o = ordered[0];
+                  const cat = getLabel(o.event.category);
+                  return (
                     <ul className="mt-0.5 min-w-0 space-y-0.5">
-                      {chips.map((o) => {
-                        const cat = getLabel(o.event.category);
-                        return (
-                          <li
-                            key={o.event.id + o.date}
-                            className={
-                              "truncate rounded-[3px] px-1 py-px text-[9px] font-medium leading-tight " +
-                              (o.completed ? "text-muted line-through" : "text-ink/90")
-                            }
-                            style={{
-                              backgroundColor: o.completed ? "transparent" : cat.bg + "D0",
-                              borderLeft: `2.5px solid ${cat.accent}`,
-                            }}
-                            title={o.event.title + (o.event.description ? ` — ${o.event.description}` : "")}
-                          >
-                            {o.event.title}
-                          </li>
-                        );
-                      })}
+                      <li
+                        className={
+                          "truncate rounded-[3px] px-1 py-px text-[9px] font-medium leading-tight " +
+                          (o.completed ? "text-muted line-through" : "text-ink/90")
+                        }
+                        style={{
+                          backgroundColor: o.completed ? "transparent" : cat.bg + "D0",
+                          borderLeft: `2.5px solid ${cat.accent}`,
+                        }}
+                        title={o.event.title + (o.event.description ? ` — ${o.event.description}` : "")}
+                      >
+                        {o.event.title}
+                      </li>
                     </ul>
-                    {dots.length > 0 && (
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {dots.map((o) => {
-                          const cat = getLabel(o.event.category);
-                          return (
-                            <span
-                              key={o.event.id + o.date}
-                              className="h-2 w-2 rounded-full"
-                              style={
-                                o.completed
-                                  ? { border: `1.5px solid ${cat.accent}`, opacity: 0.5 }
-                                  : { backgroundColor: cat.accent }
-                              }
-                              title={o.event.title + (o.completed ? " (done)" : "")}
-                            />
-                          );
-                        })}
-                        <span className="text-[9px] font-semibold text-muted">+{dots.length}</span>
-                      </div>
-                    )}
-                  </>
+                  );
+                }
+                if (ordered.length === 0) return null;
+                return (
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {ordered.map((o) => {
+                      const cat = getLabel(o.event.category);
+                      return (
+                        <span
+                          key={o.event.id + o.date}
+                          className="h-2 w-2 rounded-full"
+                          style={
+                            o.completed
+                              ? { border: `1.5px solid ${cat.accent}`, opacity: 0.5 }
+                              : { backgroundColor: cat.accent }
+                          }
+                          title={o.event.title + (o.completed ? " (done)" : "")}
+                        />
+                      );
+                    })}
+                    <span className="text-[9px] font-semibold text-muted">{ordered.length}</span>
+                  </div>
                 );
               })()}
             </button>
