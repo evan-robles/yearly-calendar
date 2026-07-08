@@ -89,11 +89,30 @@ components/
                    and EventForm subcomponents.
   CategoryLegend.tsx  Color-key dropdown.
 lib/
-  types.ts         CalendarEvent, CategoryId, CATEGORIES (color metadata).
+  types.ts         CalendarEvent, Recurrence, CategoryId, CATEGORIES.
   seed.ts          Default events carried over from the LaTeX calendar.
   useEvents.ts     React hook that owns event state + localStorage I/O.
-  date-utils.ts    Pure date helpers (month grid, ISO formatting).
+  useGistSync.ts   React hook for cross-device sync via a private GitHub gist.
+  useReminders.ts  Notification sweep (expands recurring events).
+  recurrence.ts    Render-time expansion of recurring events into occurrences.
+  validation.ts    Shared event validation/coercion (import, restore, sync).
+  migrate.ts       Versioned localStorage migration (v1 → v2).
+  date-utils.ts    Pure date helpers (month grid, ISO math, DST-safe diff).
 ```
+
+## What changed vs. the original
+
+- **Cross-device sync** via a private GitHub gist (see above).
+- **Recurring events** — weekly / monthly / every-semester / yearly, with an
+  optional end date. Stored once and expanded at render time; each occurrence
+  can be marked done independently.
+- **Search & category filter** — a search bar (title/description) plus category
+  chips filter what's shown across the visible years, non-destructively.
+- **Backward/forward year paging** — the 4-year window slides with ◂ / ▸ and a
+  **Today** button, so past and far-future years are reachable.
+- **Correctness** — every event carries an `updatedAt` (drives newest-wins
+  sync); localStorage is versioned + migrated; the reminder day-count is
+  DST-safe; and blocking `window.confirm` dialogs were replaced with in-app ones.
 
 ## Cross-device sync (GitHub Gist)
 
@@ -145,9 +164,9 @@ sync can bring it back; delete on both or re-sync after deleting.
   to be unique; using `seed-NNN` is a convention, not a requirement. Note
   that seed changes only show up for users who haven't yet saved anything to
   localStorage (or who hit the Reset button).
-- **Change the year span** — edit `YEARS` in `app/page.tsx`. The current logic
-  starts at `today.getFullYear()` and shows four years; tweak the array if
-  you want a different window.
+- **Change the year span** — edit `WINDOW_SIZE` in `app/page.tsx` (default 4).
+  The visible window starts at the current year and slides via the ◂ / ▸ paging
+  controls; `WINDOW_SIZE` sets how many year tabs show at once.
 - **Switch to Sunday-start** — edit `DAY_HEADERS_MON_FIRST` and the
   `offsetMonFirst` calculation in `lib/date-utils.ts`.
 

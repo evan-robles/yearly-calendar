@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, RotateCcw, Trash2 } from "lucide-react";
+import { CalendarDays, RotateCcw, Trash2, ChevronLeft, ChevronRight, CalendarClock } from "lucide-react";
 import { useEvents } from "@/lib/useEvents";
 import { useReminders } from "@/lib/useReminders";
 import { useGistSync } from "@/lib/useGistSync";
-import { todayISO } from "@/lib/date-utils";
+import { todayISO, startOfYearISO, endOfYearISO } from "@/lib/date-utils";
+import { expandToMap, expandEvent } from "@/lib/recurrence";
+import type { CategoryId } from "@/lib/types";
 import { YearCalendar } from "@/components/YearCalendar";
 import { CategoryLegend } from "@/components/CategoryLegend";
 import { DayDrawer } from "@/components/DayDrawer";
@@ -13,23 +15,104 @@ import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
 import { BackupMenu } from "@/components/BackupMenu";
 import { RemindersToggle } from "@/components/RemindersToggle";
 import { SyncMenu } from "@/components/SyncMenu";
+import { FilterBar } from "@/components/FilterBar";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
-// 4-year window starting from "now" (the year of today). Recomputed at module
-// load — fine for an SPA-style app; if you want it strictly relative to the
-// current second, recompute inside the component.
+// The year of "today", computed at module load. Used only to seed the initial
+// view and to highlight today — the visible window is now user-navigable.
 const TODAY = todayISO();
-const START_YEAR = Number(TODAY.slice(0, 4));
-const YEARS = [START_YEAR, START_YEAR + 1, START_YEAR + 2, START_YEAR + 3];
+const THIS_YEAR = Number(TODAY.slice(0, 4));
+const WINDOW_SIZE = 4; // number of year tabs shown at once
 
 export default function HomePage() {
   const ev = useEvents();
   const reminders = useReminders(ev.events, ev.hydrated);
   const sync = useGistSync(ev.events, ev.hydrated, ev.mergeNewestWins);
-  const [year, setYear] = useState<number>(START_YEAR);
+
+  // Sliding 4-year window. `windowStart` is the first visible year; the user can
+  // page it backward/forward or jump back to "today".
+  const [windowStart, setWindowStart] = useState<number>(THIS_YEAR);
+  const [year, setYear] = useState<number>(THIS_YEAR);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+
+  // Filter state.
+  const [query, setQuery] = useState("");
+  const [activeCategories, setActiveCategories] = useState<Set<CategoryId>>(new Set());
+
+  const visibleYears = useMemo(
+    () => Array.from({ length: WINDOW_SIZE }, (_, i) => windowStart + i),
+    [windowStart]
+  );
+
+  // Keep the selected `year` inside the visible window when paging.
+  useEffect(() => {
+    if (year < windowStart || year > windowStart + WINDOW_SIZE - 1) {
+      setYear(windowStart);
+    }
+  }, [windowStart, year]);
+
+  // Filter predicate over base events (applied before recurrence expansion).
+  const matchesFilter = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (title: string, description: string | undefined, category: CategoryId) => {
+      if (activeCategories.size > 0 && !activeCategories.has(category)) return false;
+      if (!q) return true;
+      return title.toLowerCase().includes(q) || (description ?? "").toLowerCase().includes(q);
+    };
+  }, [query, activeCategories]);
+
+  const filtering = query.trim().length > 0 || activeCategories.size > 0;
+
+  const filteredEvents = useMemo(
+    () => ev.events.filter((e) => matchesFilter(e.title, e.description, e.category)),
+    [ev.events, matchesFilter]
+  );
+
+  // Expand (filtered) events into occurrences for the visible year only.
+  const occurrencesByDate = useMemo(
+    () => expandToMap(filteredEvents, startOfYearISO(year), endOfYearISO(year)),
+    [filteredEvents, year]
+  );
+
+  // Occurrences for the selected day's drawer (from filtered set so the drawer
+  // agrees with what's shown; when not filtering this is everything).
+  const selectedOccurrences = useMemo(() => {
+    if (!selectedDate) return [];
+    return filteredEvents.flatMap((e) => expandEvent(e, selectedDate, selectedDate));
+  }, [selectedDate, filteredEvents]);
+
+  // Total matches across visible years (for the filter count).
+  const matchCount = useMemo(() => {
+    if (!filtering) return 0;
+    let n = 0;
+    for (const y of visibleYears) {
+      const map = expandToMap(filteredEvents, startOfYearISO(y), endOfYearISO(y));
+      for (const list of map.values()) n += list.length;
+    }
+    return n;
+  }, [filtering, filteredEvents, visibleYears]);
+
+  const toggleCategory = (id: CategoryId) => {
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setQuery("");
+    setActiveCategories(new Set());
+  };
+
+  const goToToday = () => {
+    setWindowStart(THIS_YEAR);
+    setYear(THIS_YEAR);
+    didScrollRef.current = false; // allow re-scroll to today
+  };
 
   // Scroll today's cell into view once, after first hydration, but only when
   // we're on the year that actually contains today.
@@ -37,7 +120,7 @@ export default function HomePage() {
   useEffect(() => {
     if (didScrollRef.current) return;
     if (!ev.hydrated) return;
-    if (year !== START_YEAR) return;
+    if (year !== THIS_YEAR) return;
     const t = window.setTimeout(() => {
       const el = document.querySelector('[data-today="true"]');
       if (el) {
@@ -63,7 +146,7 @@ export default function HomePage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Yearly Calendar</h1>
             <p className="text-sm text-neutral-500">
-              {YEARS[0]} – {YEARS[YEARS.length - 1]} · {totals.done} of {totals.all} done
+              {visibleYears[0]} – {visibleYears[visibleYears.length - 1]} · {totals.done} of {totals.all} done
             </p>
           </div>
         </div>
@@ -101,9 +184,17 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Year nav */}
+      {/* Year nav with paging */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {YEARS.map((y) => (
+        <button
+          onClick={() => setWindowStart((s) => s - 1)}
+          className="inline-flex items-center rounded-md border border-neutral-200 bg-white p-1.5 text-neutral-600 hover:bg-neutral-100"
+          title="Earlier years"
+          aria-label="Earlier years"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {visibleYears.map((y) => (
           <button
             key={y}
             onClick={() => setYear(y)}
@@ -117,16 +208,43 @@ export default function HomePage() {
             {y}
           </button>
         ))}
+        <button
+          onClick={() => setWindowStart((s) => s + 1)}
+          className="inline-flex items-center rounded-md border border-neutral-200 bg-white p-1.5 text-neutral-600 hover:bg-neutral-100"
+          title="Later years"
+          aria-label="Later years"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <button
+          onClick={goToToday}
+          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+          title="Jump back to the current year"
+        >
+          <CalendarClock className="h-3.5 w-3.5" />
+          Today
+        </button>
         <div className="ml-auto">
           <CategoryLegend />
         </div>
       </div>
 
+      {/* Search & filter */}
+      <FilterBar
+        query={query}
+        onQuery={setQuery}
+        activeCategories={activeCategories}
+        onToggleCategory={toggleCategory}
+        onClear={clearFilters}
+        matchCount={matchCount}
+        filtering={filtering}
+      />
+
       {/* Calendar */}
       {ev.hydrated ? (
         <YearCalendar
           year={year}
-          eventsByDate={ev.eventsByDate}
+          occurrencesByDate={occurrencesByDate}
           onSelectDay={setSelectedDate}
           today={TODAY}
         />
@@ -140,12 +258,12 @@ export default function HomePage() {
       {selectedDate && (
         <DayDrawer
           date={selectedDate}
-          events={ev.eventsByDate.get(selectedDate) ?? []}
+          occurrences={selectedOccurrences}
           onClose={() => setSelectedDate(null)}
           onAdd={ev.addEvent}
           onUpdate={ev.updateEvent}
           onDelete={ev.deleteEvent}
-          onToggleComplete={ev.toggleComplete}
+          onToggleComplete={ev.toggleOccurrenceComplete}
         />
       )}
 
@@ -153,7 +271,7 @@ export default function HomePage() {
       {bulkDeleteOpen && (
         <BulkDeleteDialog
           events={ev.events}
-          availableYears={YEARS}
+          availableYears={visibleYears}
           today={TODAY}
           onCancel={() => setBulkDeleteOpen(false)}
           onConfirm={(predicate) => {

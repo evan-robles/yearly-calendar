@@ -12,6 +12,7 @@ import {
 } from "@/lib/types";
 import { formatLong } from "@/lib/date-utils";
 import { LEAD_TIME_OPTIONS } from "@/lib/useReminders";
+import type { Occurrence } from "@/lib/recurrence";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 /** Draft shape produced by the form — id and updatedAt are assigned by the store. */
@@ -19,15 +20,16 @@ type EventDraft = Omit<CalendarEvent, "id" | "updatedAt">;
 
 interface Props {
   date: string; // ISO YYYY-MM-DD
-  events: CalendarEvent[];
+  occurrences: Occurrence[];
   onClose: () => void;
   onAdd: (draft: EventDraft) => void;
   onUpdate: (id: string, updates: Partial<Omit<CalendarEvent, "id">>) => void;
   onDelete: (id: string) => void;
-  onToggleComplete: (id: string) => void;
+  /** Toggle completion for the occurrence on THIS date (handles recurring). */
+  onToggleComplete: (id: string, date: string) => void;
 }
 
-export function DayDrawer({ date, events, onClose, onAdd, onUpdate, onDelete, onToggleComplete }: Props) {
+export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelete, onToggleComplete }: Props) {
   const [composing, setComposing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<CalendarEvent | null>(null);
@@ -61,7 +63,7 @@ export function DayDrawer({ date, events, onClose, onAdd, onUpdate, onDelete, on
       <aside className="thin-scroll flex w-full max-w-md flex-col overflow-y-auto bg-white shadow-2xl sm:max-w-lg">
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
           <div>
-            <p className="text-xs uppercase tracking-wider text-neutral-500">{events.length} event{events.length === 1 ? "" : "s"}</p>
+            <p className="text-xs uppercase tracking-wider text-neutral-500">{occurrences.length} event{occurrences.length === 1 ? "" : "s"}</p>
             <h2 className="text-lg font-semibold">{formatLong(date)}</h2>
           </div>
           <button
@@ -74,14 +76,15 @@ export function DayDrawer({ date, events, onClose, onAdd, onUpdate, onDelete, on
         </header>
 
         <div className="flex flex-col gap-3 p-4">
-          {events.length === 0 && !composing && (
+          {occurrences.length === 0 && !composing && (
             <p className="text-sm text-neutral-500">No events on this day.</p>
           )}
 
-          {events.map((event) =>
-            editingId === event.id ? (
+          {occurrences.map((occ) => {
+            const event = occ.event;
+            return editingId === event.id ? (
               <EventForm
-                key={event.id}
+                key={event.id + occ.date}
                 initial={event}
                 date={date}
                 onCancel={() => setEditingId(null)}
@@ -92,14 +95,15 @@ export function DayDrawer({ date, events, onClose, onAdd, onUpdate, onDelete, on
               />
             ) : (
               <EventCard
-                key={event.id}
+                key={event.id + occ.date}
                 event={event}
+                occurrenceCompleted={occ.completed}
                 onEdit={() => setEditingId(event.id)}
                 onDelete={() => setPendingDelete(event)}
-                onToggleComplete={() => onToggleComplete(event.id)}
+                onToggleComplete={() => onToggleComplete(event.id, occ.date)}
               />
-            )
-          )}
+            );
+          })}
 
           {composing ? (
             <EventForm
@@ -148,16 +152,20 @@ export function DayDrawer({ date, events, onClose, onAdd, onUpdate, onDelete, on
 
 function EventCard({
   event,
+  occurrenceCompleted,
   onEdit,
   onDelete,
   onToggleComplete,
 }: {
   event: CalendarEvent;
+  /** Completion of THIS occurrence (differs from event.completed for series). */
+  occurrenceCompleted: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onToggleComplete: () => void;
 }) {
   const cat = CATEGORIES[event.category];
+  const done = occurrenceCompleted;
   return (
     <article
       className="rounded-md border border-neutral-200 p-3"
@@ -166,10 +174,10 @@ function EventCard({
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
-          checked={event.completed}
+          checked={done}
           onChange={onToggleComplete}
           className="mt-0.5 h-4 w-4 cursor-pointer rounded border-neutral-300"
-          aria-label={event.completed ? "Mark not done" : "Mark done"}
+          aria-label={done ? "Mark not done" : "Mark done"}
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -182,7 +190,7 @@ function EventCard({
             <h3
               className={
                 "truncate text-sm font-semibold " +
-                (event.completed ? "text-neutral-400 line-through" : "text-neutral-900")
+                (done ? "text-neutral-400 line-through" : "text-neutral-900")
               }
             >
               {event.title}
@@ -201,7 +209,7 @@ function EventCard({
             <p
               className={
                 "mt-1 text-xs leading-relaxed " +
-                (event.completed ? "text-neutral-400 line-through" : "text-neutral-600")
+                (done ? "text-neutral-400 line-through" : "text-neutral-600")
               }
             >
               {event.description}

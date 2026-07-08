@@ -1,18 +1,18 @@
 "use client";
 
 import { CATEGORIES } from "@/lib/types";
-import type { CalendarEvent } from "@/lib/types";
+import type { Occurrence } from "@/lib/recurrence";
 import { MONTH_NAMES, DAY_HEADERS_MON_FIRST, monthGrid, buildISODate } from "@/lib/date-utils";
 
 interface MonthProps {
   year: number;
   monthIndex: number;
-  eventsByDate: Map<string, CalendarEvent[]>;
+  occurrencesByDate: Map<string, Occurrence[]>;
   onSelectDay: (isoDate: string) => void;
   today: string;
 }
 
-export function MonthView({ year, monthIndex, eventsByDate, onSelectDay, today }: MonthProps) {
+export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, today }: MonthProps) {
   const grid = monthGrid(year, monthIndex);
 
   return (
@@ -39,13 +39,13 @@ export function MonthView({ year, monthIndex, eventsByDate, onSelectDay, today }
             return <div key={idx} className="aspect-[5/4] border-b border-r border-neutral-100 bg-neutral-50/50 last:border-r-0" />;
           }
           const iso = buildISODate(year, monthIndex, day);
-          const events = eventsByDate.get(iso) ?? [];
+          const occs = occurrencesByDate.get(iso) ?? [];
 
           // Pick the highest-priority category color for the cell tint.
           const topCategory =
-            events.length > 0
-              ? events
-                  .map((e) => CATEGORIES[e.category])
+            occs.length > 0
+              ? occs
+                  .map((o) => CATEGORIES[o.event.category])
                   .sort((a, b) => a.priority - b.priority)[0]
               : null;
 
@@ -59,7 +59,7 @@ export function MonthView({ year, monthIndex, eventsByDate, onSelectDay, today }
             ? { backgroundColor: "#DBEAFE" } // blue-100
             : isPast
             ? { backgroundColor: "#EEEEEE" } // faint gray
-            : topCategory && events.some((e) => !e.completed)
+            : topCategory && occs.some((o) => !o.completed)
             ? { backgroundColor: topCategory.bg + "55" } // ~33% opacity
             : undefined;
 
@@ -91,28 +91,28 @@ export function MonthView({ year, monthIndex, eventsByDate, onSelectDay, today }
                 >
                   {day}
                 </span>
-                {events.length > 3 && (
-                  <span className="text-[9px] text-neutral-500">+{events.length - 3}</span>
+                {occs.length > 3 && (
+                  <span className="text-[9px] text-neutral-500">+{occs.length - 3}</span>
                 )}
               </div>
 
               <ul className="mt-0.5 space-y-0.5">
-                {events.slice(0, 3).map((e) => {
-                  const cat = CATEGORIES[e.category];
+                {occs.slice(0, 3).map((o) => {
+                  const cat = CATEGORIES[o.event.category];
                   return (
                     <li
-                      key={e.id}
+                      key={o.event.id + o.date}
                       className={
                         "truncate rounded px-1 text-[9px] leading-tight " +
-                        (e.completed ? "text-neutral-400 line-through" : "text-neutral-800")
+                        (o.completed ? "text-neutral-400 line-through" : "text-neutral-800")
                       }
                       style={{
-                        backgroundColor: e.completed ? "transparent" : cat.bg,
+                        backgroundColor: o.completed ? "transparent" : cat.bg,
                         borderLeft: `2px solid ${cat.accent}`,
                       }}
-                      title={e.title + (e.description ? ` — ${e.description}` : "")}
+                      title={o.event.title + (o.event.description ? ` — ${o.event.description}` : "")}
                     >
-                      {e.title}
+                      {o.event.title}
                     </li>
                   );
                 })}
