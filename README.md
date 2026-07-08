@@ -41,10 +41,11 @@ npm start
   finished semester, an entire year you no longer need, or starting fresh.
 - **Today is highlighted** — the current day cell is filled blue and ringed,
   and the page auto-scrolls today into view on first load.
-- **Reminders** — toggle browser notifications from the Reminders dropdown.
-  When on, each event reminds you according to its own setting:
-    - **Default** (the initial setting) — fires 7, 3, 1, and 0 days before
-      the event, but only for Deadline / Milestone / UChicago categories.
+- **Reminders** — toggle browser notifications from the Reminders dropdown, and
+  optionally daily **email reminders** (see "Email reminders" below).
+  Each event reminds you according to its own setting:
+    - **Default** — fires 7, 3, 1, and 0 days before the event, but only if the
+      event's label has **Auto-remind** enabled (set per label in Manage labels).
     - **None** — never fires for this event.
     - **Custom** — pick any combination of 60 / 30 / 14 / 7 / 3 / 1 / day-of
       lead times. Fires regardless of category.
@@ -161,6 +162,47 @@ sync can bring it back; delete on both or re-sync after deleting.
 > This is the standard token-based pattern for syncing a static (serverless)
 > app. If you'd prefer the token never live in the browser, that requires adding
 > a backend, which trades away the free static hosting.
+
+## Email reminders (scheduled GitHub Action)
+
+A static site can't send email on its own — nothing runs when your browser is
+closed. So email reminders are handled by a **scheduled GitHub Action in this
+repo** (`.github/workflows/email-reminders.yml`) that runs once a day, reads the
+**same private gist** the app syncs to, works out which events are due per their
+lead-times (same rules as the in-app reminders — a per-event override, else the
+event's label with **Auto-remind** on → the default 7/3/1/day-of schedule), and
+emails you a single digest. It stays silent on days nothing is due.
+
+**Requires cross-device sync to be set up first** (the Action reads the gist).
+Keep the app's **Auto-sync** on, or hit **Sync now**, so the gist is current.
+
+### Setup
+
+1. Create a free **[Resend](https://resend.com)** account, verify a sender
+   address/domain, and copy an API key.
+2. In this repo: **Settings → Secrets and variables → Actions → New repository
+   secret**, and add:
+   - `GIST_ID` — the gist id (shown in the app's Sync panel / the gist URL)
+   - `GIST_TOKEN` — a GitHub PAT with **only** the `gist` scope (you can reuse
+     the same token you use for app sync)
+   - `RESEND_API_KEY` — your Resend key
+   - `TO_EMAIL` — where reminders go
+   - `FROM_EMAIL` — a Resend-verified sender, e.g. `Calendar <cal@yourdomain.com>`
+3. (Optional) Add a repository **variable** `TIMEZONE` (default
+   `America/Chicago`) to control what "today" means.
+4. Test it now: **Actions → Email reminders → Run workflow**, tick **dry run**
+   to print the digest without sending, or leave it off to send a real email.
+
+### Notes & honesty
+
+- **Timing is best-effort.** GitHub's scheduled Actions aren't to-the-minute and
+  can run late under load; treat it as "sometime each morning," not an alarm.
+- **It reads your last synced state**, so an edit you made but didn't sync won't
+  be reflected until the next sync.
+- **Provider is swappable.** The script (`scripts/email-reminders.mjs`) uses the
+  Resend HTTP API; point it at any SMTP/API provider by editing `sendEmail`.
+- Until the secrets are added, the workflow **fails fast and sends nothing** —
+  that's expected, not a broken deploy.
 
 ## Customizing
 

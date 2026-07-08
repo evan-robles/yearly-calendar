@@ -1,0 +1,50 @@
+name: Email reminders
+
+# Sends a daily digest of upcoming calendar reminders by reading the synced gist.
+# This is INDEPENDENT of the site deploy — it needs repo secrets to do anything;
+# without them it fails fast (visible in the Actions tab) and sends nothing.
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   GIST_ID, GIST_TOKEN, RESEND_API_KEY, TO_EMAIL, FROM_EMAIL
+# Optional repository variable:
+#   TIMEZONE (default America/Chicago)
+
+on:
+  schedule:
+    # ~07:03 America/Chicago. Cron is UTC; 12:03 UTC ≈ 07:03 CDT / 06:03 CST.
+    # Scheduled Actions are best-effort and may run late under load.
+    - cron: "3 12 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the digest instead of sending"
+        type: boolean
+        default: false
+
+concurrency:
+  group: email-reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Send reminder digest
+        env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          TIMEZONE: ${{ vars.TIMEZONE || 'America/Chicago' }}
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '0' }}
+        run: node scripts/email-reminders.mjs
