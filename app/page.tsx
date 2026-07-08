@@ -14,6 +14,7 @@ import { CategoryLegend } from "@/components/CategoryLegend";
 import { DayDrawer } from "@/components/DayDrawer";
 import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
 import { BackupMenu } from "@/components/BackupMenu";
+import { CalendarMenu } from "@/components/CalendarMenu";
 import { RemindersToggle } from "@/components/RemindersToggle";
 import { SyncMenu } from "@/components/SyncMenu";
 import { FilterBar } from "@/components/FilterBar";
@@ -194,6 +195,15 @@ export default function HomePage() {
               <Tag className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Labels</span>
             </button>
+            <CalendarMenu
+              events={ev.events}
+              labels={lbl.labels}
+              getLabel={lbl.getLabel}
+              onImport={ev.addMany}
+              onCreateImportedLabel={() =>
+                lbl.createLabel({ label: "Imported", bg: "#E2E4E8", accent: "#4A5568", remindByDefault: false })
+              }
+            />
             <BackupMenu events={ev.events} onReplace={ev.replaceEvents} onMerge={ev.mergeEvents} />
             <button
               onClick={() => setBulkDeleteOpen(true)}

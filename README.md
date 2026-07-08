@@ -41,8 +41,9 @@ npm start
   finished semester, an entire year you no longer need, or starting fresh.
 - **Today is highlighted** — the current day cell is filled blue and ringed,
   and the page auto-scrolls today into view on first load.
-- **Reminders** — toggle browser notifications from the Reminders dropdown, and
-  optionally daily **email reminders** (see "Email reminders" below).
+- **Reminders** — toggle browser notifications from the Reminders dropdown. For
+  reminders that reach you when the tab is closed (including email), export to
+  your calendar app via **Calendar → Export (.ics)** (see below).
   Each event reminds you according to its own setting:
     - **Default** — fires 7, 3, 1, and 0 days before the event, but only if the
       event's label has **Auto-remind** enabled (set per label in Manage labels).
@@ -163,46 +164,37 @@ sync can bring it back; delete on both or re-sync after deleting.
 > app. If you'd prefer the token never live in the browser, that requires adding
 > a backend, which trades away the free static hosting.
 
-## Email reminders (scheduled GitHub Action)
+## Import / export calendars (.ics)
 
-A static site can't send email on its own — nothing runs when your browser is
-closed. So email reminders are handled by a **scheduled GitHub Action in this
-repo** (`.github/workflows/email-reminders.yml`) that runs once a day, reads the
-**same private gist** the app syncs to, works out which events are due per their
-lead-times (same rules as the in-app reminders — a per-event override, else the
-event's label with **Auto-remind** on → the default 7/3/1/day-of schedule), and
-emails you a single digest. It stays silent on days nothing is due.
+The **Calendar** menu in the header imports and exports standard iCalendar
+(`.ics`) files — the format Google Calendar, Apple Calendar, and Outlook all
+understand.
 
-**Requires cross-device sync to be set up first** (the Action reads the gist).
-Keep the app's **Auto-sync** on, or hit **Sync now**, so the gist is current.
+**This is the recommended way to get email/phone reminders.** A static site
+can't send email itself, but your calendar app can: export your events, import
+them into Google/Apple Calendar, and *those* apps deliver reliable reminders
+(including email, per your calendar's notification settings) even when this tab
+is closed.
 
-### Setup
+### Export
 
-1. Create a free **[Resend](https://resend.com)** account, verify a sender
-   address/domain, and copy an API key.
-2. In this repo: **Settings → Secrets and variables → Actions → New repository
-   secret**, and add:
-   - `GIST_ID` — the gist id (shown in the app's Sync panel / the gist URL)
-   - `GIST_TOKEN` — a GitHub PAT with **only** the `gist` scope (you can reuse
-     the same token you use for app sync)
-   - `RESEND_API_KEY` — your Resend key
-   - `TO_EMAIL` — where reminders go
-   - `FROM_EMAIL` — a Resend-verified sender, e.g. `Calendar <cal@yourdomain.com>`
-3. (Optional) Add a repository **variable** `TIMEZONE` (default
-   `America/Chicago`) to control what "today" means.
-4. Test it now: **Actions → Email reminders → Run workflow**, tick **dry run**
-   to print the digest without sending, or leave it off to send a real email.
+- **Calendar → Export to calendar (.ics)** downloads
+  `yearly-calendar-YYYY-MM-DD.ics`.
+- Each event is exported as an **all-day event** on its date. Recurring events
+  become real repeating events (`RRULE`). Each event's reminder lead-times
+  (7/3/1/day-of, or your per-event choices) are exported as **alarms**, which the
+  calendar app maps to its own notifications.
+- Import it: **Google Calendar** → Settings → Import & export → Import; or open
+  the file in **Apple Calendar**. (To keep it updated, re-export and re-import,
+  or publish the file and subscribe to its URL.)
 
-### Notes & honesty
+### Import
 
-- **Timing is best-effort.** GitHub's scheduled Actions aren't to-the-minute and
-  can run late under load; treat it as "sometime each morning," not an alarm.
-- **It reads your last synced state**, so an edit you made but didn't sync won't
-  be reflected until the next sync.
-- **Provider is swappable.** The script (`scripts/email-reminders.mjs`) uses the
-  Resend HTTP API; point it at any SMTP/API provider by editing `sendEmail`.
-- Until the secrets are added, the workflow **fails fast and sends nothing** —
-  that's expected, not a broken deploy.
+- **Calendar → Import from .ics** reads a calendar file, shows how many events it
+  found, and lets you pick a **label** to assign them (or auto-creates an
+  "Imported" label). The events merge into your calendar.
+- Common repeat rules (weekly/monthly/every-6-months/yearly, with an end date)
+  are recognized; unusual rules import as single events rather than guessing.
 
 ## Customizing
 

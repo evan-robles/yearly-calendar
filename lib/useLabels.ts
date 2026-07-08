@@ -73,6 +73,18 @@ export function useLabels() {
     []
   );
 
+  /** Create a label and return its new id synchronously (used by .ics import,
+   *  which needs the id immediately to tag the imported events). */
+  const createLabel = useCallback((draft: Omit<Label, "id" | "priority">): string => {
+    const id = genId();
+    setLabels((prev) => {
+      const priority = prev.length ? Math.max(...prev.map((l) => l.priority)) + 1 : 1;
+      return [...prev, { ...draft, id, priority }];
+    });
+    setLabelsUpdatedAt(nowISO());
+    return id;
+  }, []);
+
   const updateLabel = useCallback((id: string, patch: Partial<Omit<Label, "id">>) => {
     setLabels((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
     setLabelsUpdatedAt(nowISO());
@@ -127,6 +139,7 @@ export function useLabels() {
     hydrated,
     getLabel,
     addLabel,
+    createLabel,
     updateLabel,
     deleteLabel,
     moveLabel,

@@ -51,6 +51,15 @@ export function useEvents() {
     setEvents((prev) => [...prev, { ...draft, id: genId(), updatedAt: nowISO() }]);
   }, []);
 
+  /** Bulk-add drafts (e.g. from .ics import) in a single state update. */
+  const addMany = useCallback((drafts: Omit<CalendarEvent, "id" | "updatedAt">[]) => {
+    const stamp = nowISO();
+    setEvents((prev) => [
+      ...prev,
+      ...drafts.map((d) => ({ ...d, id: genId(), updatedAt: stamp })),
+    ]);
+  }, []);
+
   const updateEvent = useCallback((id: string, updates: Partial<Omit<CalendarEvent, "id">>) => {
     setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates, updatedAt: nowISO() } : e)));
   }, []);
@@ -148,6 +157,7 @@ export function useEvents() {
     eventsByDate,
     hydrated,
     addEvent,
+    addMany,
     updateEvent,
     deleteEvent,
     toggleComplete,
