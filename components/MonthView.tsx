@@ -82,7 +82,7 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
               style={tintStyle}
               data-today={isToday ? "true" : undefined}
               className={
-                "group relative aspect-[5/4] cursor-pointer border-b border-r border-line/50 p-1 text-left transition-colors last:border-r-0 " +
+                "group relative aspect-[5/4] min-w-0 cursor-pointer overflow-hidden border-b border-r border-line/50 p-1 text-left transition-colors last:border-r-0 " +
                 (isToday
                   ? "ring-2 ring-inset ring-brand hover:brightness-[0.97]"
                   : isPast
@@ -111,7 +111,7 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
                 </span>
               </div>
 
-              <ul className="mt-0.5 space-y-0.5">
+              <ul className="mt-0.5 min-w-0 space-y-0.5">
                 {occs.slice(0, 3).map((o) => {
                   const cat = getLabel(o.event.category);
                   return (
