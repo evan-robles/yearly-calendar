@@ -17,8 +17,27 @@ interface Props {
   onClose: () => void;
 }
 
-const NEW_BG = "#DBEAFE";
-const NEW_ACCENT = "#1D4ED8";
+/**
+ * Curated color palette (Google-Calendar style). Each swatch pairs a light
+ * `bg` tint (used to fill chips/cells) with a bold `accent` (borders/text), so
+ * picking one swatch sets both — no fiddly hex picking.
+ */
+export const LABEL_PALETTE: { name: string; bg: string; accent: string }[] = [
+  { name: "Tomato",     bg: "#FBD5D0", accent: "#D50000" },
+  { name: "Tangerine",  bg: "#FCE0C7", accent: "#E8730C" },
+  { name: "Banana",     bg: "#FDECC8", accent: "#B58A00" },
+  { name: "Sage",       bg: "#D9EAD3", accent: "#3B8046" },
+  { name: "Basil",      bg: "#CDE7D8", accent: "#0B7A5B" },
+  { name: "Peacock",    bg: "#CFE9EC", accent: "#009BA6" },
+  { name: "Blueberry",  bg: "#D6E2F7", accent: "#1B4FCC" },
+  { name: "Lavender",   bg: "#E1E0F7", accent: "#5B5BD6" },
+  { name: "Grape",      bg: "#EBD7F5", accent: "#8E24AA" },
+  { name: "Flamingo",   bg: "#F7DAE6", accent: "#C2185B" },
+  { name: "Graphite",   bg: "#E2E4E8", accent: "#4A5568" },
+  { name: "Cocoa",      bg: "#E7DCCF", accent: "#795548" },
+];
+
+const DEFAULT_SWATCH = LABEL_PALETTE[6]; // Blueberry
 
 /**
  * Modal for creating, recoloring, reordering, and deleting user labels.
@@ -49,7 +68,9 @@ export function LabelManager({
   const addNew = () => {
     const name = newName.trim();
     if (!name) return;
-    onAdd({ label: name, bg: NEW_BG, accent: NEW_ACCENT, remindByDefault: false });
+    // Rotate through the palette so consecutive new labels get distinct colors.
+    const swatch = LABEL_PALETTE[labels.length % LABEL_PALETTE.length] ?? DEFAULT_SWATCH;
+    onAdd({ label: name, bg: swatch.bg, accent: swatch.accent, remindByDefault: false });
     setNewName("");
   };
 
@@ -148,26 +169,26 @@ export function LabelManager({
                     </div>
 
                     <div className="mt-2 flex flex-wrap items-center gap-3 pl-9 text-xs">
-                      <label className="flex items-center gap-1.5 text-muted">
-                        <span>Fill</span>
-                        <input
-                          type="color"
-                          value={hex6(l.bg)}
-                          onChange={(e) => onUpdate(l.id, { bg: e.target.value })}
-                          className="h-6 w-8 cursor-pointer rounded border border-line bg-transparent p-0"
-                          aria-label="Fill color"
-                        />
-                      </label>
-                      <label className="flex items-center gap-1.5 text-muted">
-                        <span>Accent</span>
-                        <input
-                          type="color"
-                          value={hex6(l.accent)}
-                          onChange={(e) => onUpdate(l.id, { accent: e.target.value })}
-                          className="h-6 w-8 cursor-pointer rounded border border-line bg-transparent p-0"
-                          aria-label="Accent color"
-                        />
-                      </label>
+                      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Label color">
+                        {LABEL_PALETTE.map((sw) => {
+                          const selected = eqHex(l.accent, sw.accent) && eqHex(l.bg, sw.bg);
+                          return (
+                            <button
+                              key={sw.accent}
+                              type="button"
+                              onClick={() => onUpdate(l.id, { bg: sw.bg, accent: sw.accent })}
+                              title={sw.name}
+                              aria-label={sw.name}
+                              aria-pressed={selected}
+                              className={
+                                "h-5 w-5 rounded-full transition-transform hover:scale-110 " +
+                                (selected ? "ring-2 ring-offset-1 ring-ink/60" : "")
+                              }
+                              style={{ backgroundColor: sw.accent }}
+                            />
+                          );
+                        })}
+                      </div>
                       <button
                         onClick={() => onUpdate(l.id, { remindByDefault: !l.remindByDefault })}
                         className={
@@ -228,12 +249,7 @@ export function LabelManager({
   );
 }
 
-/** Native <input type=color> requires a 6-digit hex; expand #abc → #aabbcc. */
-function hex6(v: string): string {
-  const s = v.trim();
-  if (/^#[0-9a-f]{6}$/i.test(s)) return s;
-  if (/^#[0-9a-f]{3}$/i.test(s)) {
-    return "#" + s.slice(1).split("").map((c) => c + c).join("");
-  }
-  return "#000000";
+/** Case-insensitive hex compare, tolerant of surrounding whitespace. */
+function eqHex(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
