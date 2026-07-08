@@ -64,11 +64,14 @@ export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, to
           const isToday = iso === today;
           const isPast = iso < today;
 
-          // Style precedence: today (brand) > active events (soft category tint) > past (muted).
+          // Style precedence: today (brand) > active events (soft category tint)
+          // > past (slight gray) > default.
           const tintStyle = isToday
             ? { backgroundColor: "rgb(var(--brand-soft))" }
             : topCategory && occs.some((o) => !o.completed)
             ? { backgroundColor: topCategory.bg + "3A" } // ~23% opacity — subtle
+            : isPast
+            ? { backgroundColor: "rgb(var(--muted) / 0.08)" } // faint gray for past days
             : undefined;
 
           return (
