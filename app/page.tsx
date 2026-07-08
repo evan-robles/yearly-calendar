@@ -62,11 +62,14 @@ export default function HomePage() {
     [windowStart]
   );
 
-  // Keep the selected `year` inside the visible window when paging.
+  // Keep the selected `year` inside the visible window when paging. Clamp to the
+  // NEAREST edge (not always the first year) so paging left keeps the selection
+  // on the newly-revealed left year, and paging right keeps it on the right —
+  // otherwise the calendar view can appear to "stick" on the same year.
   useEffect(() => {
-    if (year < windowStart || year > windowStart + WINDOW_SIZE - 1) {
-      setYear(windowStart);
-    }
+    const lastYear = windowStart + WINDOW_SIZE - 1;
+    if (year < windowStart) setYear(windowStart);
+    else if (year > lastYear) setYear(lastYear);
   }, [windowStart, year]);
 
   // Filter predicate over base events (applied before recurrence expansion).
