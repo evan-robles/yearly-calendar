@@ -5,9 +5,9 @@ import type { Label } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
 import { MONTH_NAMES, DAY_HEADERS_MON_FIRST, monthGrid, buildISODate } from "@/lib/date-utils";
 
-// When a day has more than this many events, show fewer full chips and render the
-// remainder as tiny colored dots so the cell stays legible.
-const MAX_CHIPS_LIMIT = 3;
+// How many events show as full text chips before the rest collapse to compact
+// colored dots. 1 = show the top-priority event, everything else as dots.
+const MAX_CHIPS = 1;
 
 interface MonthProps {
   year: number;
@@ -110,13 +110,17 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
                 {hasLink && <Link2 className="h-2.5 w-2.5 text-muted" />}
               </div>
 
-              {/* Show up to MAX_CHIPS full chips; represent the rest as tiny
-                  colored dots (one per remaining event, colored by label, hollow
-                  when completed) so a busy day stays legible and countable. */}
+              {/* Show the top-priority event as a full chip; every additional
+                  event collapses to a tiny label-colored dot (hollow when done)
+                  with a count, so busy days stay compact and countable. */}
               {(() => {
-                const MAX_CHIPS = occs.length > MAX_CHIPS_LIMIT ? MAX_CHIPS_LIMIT - 1 : occs.length;
-                const chips = occs.slice(0, MAX_CHIPS);
-                const dots = occs.slice(MAX_CHIPS);
+                // Sort by label priority (lower = more important) so the chip and
+                // the leading dots reflect importance.
+                const ordered = [...occs].sort(
+                  (a, b) => getLabel(a.event.category).priority - getLabel(b.event.category).priority
+                );
+                const chips = ordered.slice(0, MAX_CHIPS);
+                const dots = ordered.slice(MAX_CHIPS);
                 return (
                   <>
                     <ul className="mt-0.5 min-w-0 space-y-0.5">
@@ -157,7 +161,7 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
                             />
                           );
                         })}
-                        <span className="text-[9px] font-semibold text-muted">{dots.length}</span>
+                        <span className="text-[9px] font-semibold text-muted">+{dots.length}</span>
                       </div>
                     )}
                   </>
