@@ -30,14 +30,14 @@ export function FilterBar({
   filtering,
 }: Props) {
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-white p-2">
-      <div className="relative flex-1 min-w-[180px]">
-        <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+    <div className="mb-5 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-2.5 shadow-soft">
+      <div className="relative min-w-[180px] flex-1">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
           placeholder="Search title or description…"
-          className="w-full rounded-md border border-neutral-300 py-1.5 pl-8 pr-2 text-sm focus:border-neutral-500 focus:outline-none"
+          className="w-full rounded-xl border border-line bg-canvas/50 py-1.5 pl-8 pr-2 text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-surface focus:outline-none"
         />
       </div>
 
@@ -49,8 +49,8 @@ export function FilterBar({
               key={c.id}
               onClick={() => onToggleCategory(c.id)}
               className={
-                "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors " +
-                (active ? "text-white" : "text-neutral-600 hover:bg-neutral-50")
+                "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all " +
+                (active ? "text-white shadow-soft" : "text-ink/70 hover:brightness-95")
               }
               style={
                 active
@@ -67,12 +67,12 @@ export function FilterBar({
 
       {filtering && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs font-medium text-muted">
             {matchCount} match{matchCount === 1 ? "" : "es"}
           </span>
           <button
             onClick={onClear}
-            className="inline-flex items-center gap-1 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
+            className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-xs text-ink/70 transition-colors hover:bg-canvas"
           >
             <X className="h-3 w-3" />
             Clear

@@ -137,122 +137,132 @@ export default function HomePage() {
     return { all, done };
   }, [ev.events]);
 
-  return (
-    <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
-      {/* Header */}
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <CalendarDays className="h-8 w-8 text-neutral-700" />
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Yearly Calendar</h1>
-            <p className="text-sm text-neutral-500">
-              {visibleYears[0]} – {visibleYears[visibleYears.length - 1]} · {totals.done} of {totals.all} done
-            </p>
-          </div>
-        </div>
+  const btnBase =
+    "inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink/80 shadow-soft transition-colors hover:bg-canvas hover:text-ink";
 
-        <div className="flex flex-wrap items-center gap-2">
-          <RemindersToggle
-            enabled={reminders.enabled}
-            permission={reminders.permission}
-            supported={reminders.supported}
-            onToggle={reminders.toggle}
-            onTest={reminders.testNotification}
-          />
-          <SyncMenu sync={sync} />
-          <BackupMenu
-            events={ev.events}
-            onReplace={ev.replaceEvents}
-            onMerge={ev.mergeEvents}
-          />
-          <button
-            onClick={() => setBulkDeleteOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
-            title="Delete events by week, month, year, or all at once"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Bulk delete
-          </button>
-          <button
-            onClick={() => setResetConfirmOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
-            title="Reset to the original seeded events"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset
-          </button>
+  return (
+    <>
+      {/* Sticky frosted header */}
+      <header className="glass sticky top-0 z-20 border-b border-line/70">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white shadow-card">
+              <CalendarDays className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="font-display text-xl font-bold tracking-tight text-ink">Yearly Calendar</h1>
+              <p className="text-xs text-muted">
+                {visibleYears[0]} – {visibleYears[visibleYears.length - 1]}
+                <span className="mx-1.5 text-line">·</span>
+                <span className="font-medium text-ink/70">{totals.done}</span> of {totals.all} done
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <RemindersToggle
+              enabled={reminders.enabled}
+              permission={reminders.permission}
+              supported={reminders.supported}
+              onToggle={reminders.toggle}
+              onTest={reminders.testNotification}
+            />
+            <SyncMenu sync={sync} />
+            <BackupMenu events={ev.events} onReplace={ev.replaceEvents} onMerge={ev.mergeEvents} />
+            <button
+              onClick={() => setBulkDeleteOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink/80 shadow-soft transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+              title="Delete events by week, month, year, or all at once"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Bulk delete</span>
+            </button>
+            <button
+              onClick={() => setResetConfirmOpen(true)}
+              className={btnBase}
+              title="Reset to the original seeded events"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Year nav with paging */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setWindowStart((s) => s - 1)}
-          className="inline-flex items-center rounded-md border border-neutral-200 bg-white p-1.5 text-neutral-600 hover:bg-neutral-100"
-          title="Earlier years"
-          aria-label="Earlier years"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        {visibleYears.map((y) => (
+      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+        {/* Year nav with paging */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-xl border border-line bg-surface p-1 shadow-soft">
+            <button
+              onClick={() => setWindowStart((s) => s - 1)}
+              className="inline-flex items-center rounded-lg p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink"
+              title="Earlier years"
+              aria-label="Earlier years"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            {visibleYears.map((y) => (
+              <button
+                key={y}
+                onClick={() => setYear(y)}
+                className={
+                  "rounded-lg px-3 py-1.5 text-sm font-semibold transition-all " +
+                  (year === y
+                    ? "bg-brand text-white shadow-card"
+                    : "text-ink/70 hover:bg-canvas hover:text-ink")
+                }
+              >
+                {y}
+              </button>
+            ))}
+            <button
+              onClick={() => setWindowStart((s) => s + 1)}
+              className="inline-flex items-center rounded-lg p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink"
+              title="Later years"
+              aria-label="Later years"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
           <button
-            key={y}
-            onClick={() => setYear(y)}
-            className={
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
-              (year === y
-                ? "bg-neutral-900 text-white"
-                : "bg-white text-neutral-700 hover:bg-neutral-100 border border-neutral-200")
-            }
+            onClick={goToToday}
+            className={btnBase}
+            title="Jump back to the current year"
           >
-            {y}
+            <CalendarClock className="h-3.5 w-3.5" />
+            Today
           </button>
-        ))}
-        <button
-          onClick={() => setWindowStart((s) => s + 1)}
-          className="inline-flex items-center rounded-md border border-neutral-200 bg-white p-1.5 text-neutral-600 hover:bg-neutral-100"
-          title="Later years"
-          aria-label="Later years"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-        <button
-          onClick={goToToday}
-          className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
-          title="Jump back to the current year"
-        >
-          <CalendarClock className="h-3.5 w-3.5" />
-          Today
-        </button>
-        <div className="ml-auto">
-          <CategoryLegend />
+          <div className="ml-auto">
+            <CategoryLegend />
+          </div>
         </div>
-      </div>
 
-      {/* Search & filter */}
-      <FilterBar
-        query={query}
-        onQuery={setQuery}
-        activeCategories={activeCategories}
-        onToggleCategory={toggleCategory}
-        onClear={clearFilters}
-        matchCount={matchCount}
-        filtering={filtering}
-      />
-
-      {/* Calendar */}
-      {ev.hydrated ? (
-        <YearCalendar
-          year={year}
-          occurrencesByDate={occurrencesByDate}
-          onSelectDay={setSelectedDate}
-          today={TODAY}
+        {/* Search & filter */}
+        <FilterBar
+          query={query}
+          onQuery={setQuery}
+          activeCategories={activeCategories}
+          onToggleCategory={toggleCategory}
+          onClear={clearFilters}
+          matchCount={matchCount}
+          filtering={filtering}
         />
-      ) : (
-        <div className="rounded-md border border-neutral-200 bg-white p-12 text-center text-sm text-neutral-500">
-          Loading…
-        </div>
-      )}
+
+        {/* Calendar */}
+        {ev.hydrated ? (
+          <YearCalendar
+            year={year}
+            occurrencesByDate={occurrencesByDate}
+            onSelectDay={setSelectedDate}
+            today={TODAY}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-64 animate-pulse rounded-2xl border border-line bg-surface/60 shadow-soft" />
+            ))}
+          </div>
+        )}
 
       {/* Day drawer (modal-ish slide-over) */}
       {selectedDate && (
@@ -295,6 +305,7 @@ export default function HomePage() {
           }}
         />
       )}
-    </main>
+      </main>
+    </>
   );
 }

@@ -4,7 +4,7 @@
 // malformed payload fails loudly (or is repaired predictably) instead of quietly
 // corrupting app state.
 
-import { CATEGORIES, type CalendarEvent, type CategoryId, type Recurrence, type RecurrenceFreq } from "./types";
+import { CATEGORIES, type CalendarEvent, type CategoryId, type EventLink, type Recurrence, type RecurrenceFreq } from "./types";
 
 const VALID_CATS = new Set(Object.keys(CATEGORIES));
 const VALID_FREQS = new Set<RecurrenceFreq>(["WEEKLY", "MONTHLY", "YEARLY", "SEMESTER"]);
@@ -12,6 +12,48 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isISODate(v: unknown): v is string {
   return typeof v === "string" && ISO_DATE.test(v);
+}
+
+/**
+ * Normalize a user/imported URL: trim, and if it has no scheme, assume https.
+ * Rejects anything that can't be parsed as an http(s) URL (returns null) so we
+ * never render a `javascript:` or otherwise unsafe href.
+ */
+export function normalizeUrl(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+function coerceLinks(raw: unknown): EventLink[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: EventLink[] = [];
+  for (const item of raw as unknown[]) {
+    if (!item || typeof item !== "object") continue;
+    const l = item as Partial<EventLink>;
+    if (typeof l.url !== "string") continue;
+    const url = normalizeUrl(l.url);
+    if (!url) continue;
+    const label = typeof l.label === "string" && l.label.trim() ? l.label.trim() : hostLabel(url);
+    out.push({ label, url });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/** A short human label derived from a URL's host (fallback when none given). */
+export function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "Link";
+  }
 }
 
 function coerceRecurrence(raw: unknown): Recurrence | undefined {
@@ -57,6 +99,7 @@ export function coerceEvent(raw: unknown, index: number, nowISO: string): Calend
     category: e.category as CategoryId,
     description: typeof e.description === "string" ? e.description : undefined,
     completed: Boolean(e.completed),
+    links: coerceLinks(e.links),
     reminderDays,
     updatedAt: isISOTimestamp(e.updatedAt) ? (e.updatedAt as string) : nowISO,
     recurrence: coerceRecurrence(e.recurrence),

@@ -90,7 +90,7 @@ export function BackupMenu({ events, onReplace, onMerge }: Props) {
     <div className="relative" data-backup-menu>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink/80 shadow-soft transition-colors hover:bg-canvas hover:text-ink"
         title="Download a backup of your events, or restore from one"
       >
         <Database className="h-3.5 w-3.5" />
@@ -99,7 +99,7 @@ export function BackupMenu({ events, onReplace, onMerge }: Props) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-64 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-lg">
+        <div className="absolute right-0 z-30 mt-1.5 w-64 animate-scale-in overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
           <button
             onClick={handleExport}
             className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-neutral-100"

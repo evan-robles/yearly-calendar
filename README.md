@@ -102,6 +102,13 @@ lib/
 
 ## What changed vs. the original
 
+- **Refined visual design** — Inter + Sora fonts (self-hosted via `next/font`),
+  a cohesive token-based palette, soft shadows, rounded surfaces, a frosted
+  sticky header, subtle animations, and a favicon.
+- **Named links on events** — each event can carry any number of labelled
+  hyperlinks (e.g. "Portal", "Instructions", "Zoom"). Links open in a new tab;
+  URLs are normalized (bare domains get `https://`) and only `http(s)` schemes
+  are allowed. A small link glyph on a day cell signals the day has a link.
 - **Cross-device sync** via a private GitHub gist (see above).
 - **Recurring events** — weekly / monthly / every-semester / yearly, with an
   optional end date. Stored once and expanded at render time; each occurrence

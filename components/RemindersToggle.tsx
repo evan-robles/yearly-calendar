@@ -33,20 +33,20 @@ export function RemindersToggle({ enabled, permission, supported, onToggle, onTe
       <button
         onClick={() => setOpen((o) => !o)}
         className={
-          "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors " +
+          "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm shadow-soft transition-colors " +
           (active
-            ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
-            : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100")
+            ? "border-brand/30 bg-brand-soft text-brand hover:brightness-95"
+            : "border-line bg-surface text-ink/80 hover:bg-canvas hover:text-ink")
         }
         title="Get desktop notifications for upcoming deadlines"
       >
         <Icon className="h-3.5 w-3.5" />
-        Reminders{active ? " on" : ""}
+        <span className="hidden sm:inline">Reminders{active ? " on" : ""}</span>
         <ChevronDown className={"h-3.5 w-3.5 transition-transform " + (open ? "rotate-180" : "")} />
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-80 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-lg">
+        <div className="absolute right-0 z-30 mt-1.5 w-80 animate-scale-in overflow-hidden rounded-xl border border-line bg-surface shadow-pop">
           <div className="border-b border-neutral-100 px-3 py-2 text-xs leading-snug text-neutral-600">
             {!supported && (
               <p>Your browser doesn't support notifications. Try Chrome, Firefox, Edge, or Safari.</p>

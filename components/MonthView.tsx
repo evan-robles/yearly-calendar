@@ -1,5 +1,6 @@
 "use client";
 
+import { Link2 } from "lucide-react";
 import { CATEGORIES } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
 import { MONTH_NAMES, DAY_HEADERS_MON_FIRST, monthGrid, buildISODate } from "@/lib/date-utils";
@@ -14,20 +15,27 @@ interface MonthProps {
 
 export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, today }: MonthProps) {
   const grid = monthGrid(year, monthIndex);
+  const isCurrentMonth = today.slice(0, 7) === `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
 
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white shadow-sm">
-      <header className="border-b border-neutral-200 bg-neutral-900 px-3 py-2 text-white">
-        <h2 className="text-sm font-semibold">
-          {MONTH_NAMES[monthIndex]} <span className="text-neutral-400">{year}</span>
+    <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card transition-shadow hover:shadow-pop">
+      <header className="flex items-center justify-between px-3.5 py-2.5">
+        <h2 className="font-display text-sm font-semibold text-ink">
+          {MONTH_NAMES[monthIndex]} <span className="font-normal text-muted">{year}</span>
         </h2>
+        {isCurrentMonth && (
+          <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand">
+            Now
+          </span>
+        )}
       </header>
 
       {/* Day-of-week header */}
-      <div className="grid grid-cols-7 border-b border-neutral-200 bg-neutral-50 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+      <div className="grid grid-cols-7 border-y border-line/70 bg-canvas/60 text-[10px] font-semibold uppercase tracking-wider text-muted">
         {DAY_HEADERS_MON_FIRST.map((d) => (
           <div key={d} className="px-1.5 py-1.5 text-center">
-            {d}
+            {d.charAt(0)}
+            <span className="hidden sm:inline">{d.slice(1)}</span>
           </div>
         ))}
       </div>
@@ -36,31 +44,31 @@ export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, to
       <div className="grid grid-cols-7">
         {grid.flat().map((day, idx) => {
           if (day === 0) {
-            return <div key={idx} className="aspect-[5/4] border-b border-r border-neutral-100 bg-neutral-50/50 last:border-r-0" />;
+            return (
+              <div
+                key={idx}
+                className="aspect-[5/4] border-b border-r border-line/50 bg-canvas/40 last:border-r-0"
+              />
+            );
           }
           const iso = buildISODate(year, monthIndex, day);
           const occs = occurrencesByDate.get(iso) ?? [];
+          const hasLink = occs.some((o) => (o.event.links?.length ?? 0) > 0);
 
-          // Pick the highest-priority category color for the cell tint.
+          // Highest-priority category color for the cell tint.
           const topCategory =
             occs.length > 0
-              ? occs
-                  .map((o) => CATEGORIES[o.event.category])
-                  .sort((a, b) => a.priority - b.priority)[0]
+              ? occs.map((o) => CATEGORIES[o.event.category]).sort((a, b) => a.priority - b.priority)[0]
               : null;
 
           const isToday = iso === today;
           const isPast = iso < today;
 
-          // Style precedence: today (blue) > past (gray) > active events (category tint).
-          // Past days override the category tint so the eye treats them as
-          // "behind us" — past events are still visible as chips inside.
+          // Style precedence: today (brand) > active events (soft category tint) > past (muted).
           const tintStyle = isToday
-            ? { backgroundColor: "#DBEAFE" } // blue-100
-            : isPast
-            ? { backgroundColor: "#EEEEEE" } // faint gray
+            ? { backgroundColor: "rgb(var(--brand-soft))" }
             : topCategory && occs.some((o) => !o.completed)
-            ? { backgroundColor: topCategory.bg + "55" } // ~33% opacity
+            ? { backgroundColor: topCategory.bg + "3A" } // ~23% opacity — subtle
             : undefined;
 
           return (
@@ -70,30 +78,33 @@ export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, to
               style={tintStyle}
               data-today={isToday ? "true" : undefined}
               className={
-                "group relative aspect-[5/4] cursor-pointer border-b border-r border-neutral-100 p-1 text-left transition-colors last:border-r-0 " +
+                "group relative aspect-[5/4] cursor-pointer border-b border-r border-line/50 p-1 text-left transition-colors last:border-r-0 " +
                 (isToday
-                  ? "ring-2 ring-inset ring-blue-500 hover:bg-blue-200/60"
+                  ? "ring-2 ring-inset ring-brand hover:brightness-[0.97]"
                   : isPast
-                  ? "hover:bg-neutral-200"
-                  : "hover:bg-neutral-100")
+                  ? "hover:bg-canvas"
+                  : "hover:bg-canvas")
               }
             >
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-center justify-between">
                 <span
                   className={
-                    "text-xs font-semibold " +
+                    "inline-flex h-5 min-w-5 items-center justify-center text-xs font-semibold " +
                     (isToday
-                      ? "text-blue-700"
+                      ? "rounded-full bg-brand px-1 text-white"
                       : isPast
-                      ? "text-neutral-400"
-                      : "text-neutral-700")
+                      ? "text-muted/70"
+                      : "text-ink/80")
                   }
                 >
                   {day}
                 </span>
-                {occs.length > 3 && (
-                  <span className="text-[9px] text-neutral-500">+{occs.length - 3}</span>
-                )}
+                <span className="flex items-center gap-0.5">
+                  {hasLink && <Link2 className="h-2.5 w-2.5 text-muted" />}
+                  {occs.length > 3 && (
+                    <span className="text-[9px] font-medium text-muted">+{occs.length - 3}</span>
+                  )}
+                </span>
               </div>
 
               <ul className="mt-0.5 space-y-0.5">
@@ -103,12 +114,12 @@ export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, to
                     <li
                       key={o.event.id + o.date}
                       className={
-                        "truncate rounded px-1 text-[9px] leading-tight " +
-                        (o.completed ? "text-neutral-400 line-through" : "text-neutral-800")
+                        "truncate rounded-[3px] px-1 py-px text-[9px] font-medium leading-tight " +
+                        (o.completed ? "text-muted line-through" : "text-ink/90")
                       }
                       style={{
-                        backgroundColor: o.completed ? "transparent" : cat.bg,
-                        borderLeft: `2px solid ${cat.accent}`,
+                        backgroundColor: o.completed ? "transparent" : cat.bg + "D0",
+                        borderLeft: `2.5px solid ${cat.accent}`,
                       }}
                       title={o.event.title + (o.event.description ? ` — ${o.event.description}` : "")}
                     >

@@ -47,6 +47,13 @@ export interface Recurrence {
   until?: string;
 }
 
+/** A named hyperlink attached to an event (e.g. an application portal, a Zoom
+ *  link, an instructions page). */
+export interface EventLink {
+  label: string;
+  url: string;
+}
+
 export interface CalendarEvent {
   id: string;
   /** ISO date YYYY-MM-DD. For a recurring event this is the FIRST occurrence. */
@@ -55,6 +62,8 @@ export interface CalendarEvent {
   title: string;
   description?: string;
   completed: boolean;
+  /** Optional named hyperlinks. */
+  links?: EventLink[];
   /** Per-event reminder override.
    *  - `undefined` → use the global defaults (7, 3, 1, 0 days, only for time-
    *    sensitive categories).

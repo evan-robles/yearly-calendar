@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Plus, Trash2, Save, Pencil, Bell, BellOff, Repeat } from "lucide-react";
+import { X, Plus, Trash2, Save, Pencil, Bell, BellOff, Repeat, Link2, ExternalLink } from "lucide-react";
 import {
   CATEGORIES,
   CATEGORY_LIST,
   RECURRENCE_LABELS,
   type CalendarEvent,
   type CategoryId,
+  type EventLink,
   type RecurrenceFreq,
 } from "@/lib/types";
 import { formatLong } from "@/lib/date-utils";
 import { LEAD_TIME_OPTIONS } from "@/lib/useReminders";
+import { normalizeUrl, hostLabel } from "@/lib/validation";
 import type { Occurrence } from "@/lib/recurrence";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -54,21 +56,23 @@ export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelet
     <div className="fixed inset-0 z-30 flex">
       {/* Backdrop */}
       <div
-        className="flex-1 bg-black/30 transition-opacity"
+        className="flex-1 animate-fade-in bg-ink/40 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Panel */}
-      <aside className="thin-scroll flex w-full max-w-md flex-col overflow-y-auto bg-white shadow-2xl sm:max-w-lg">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
+      <aside className="thin-scroll flex w-full max-w-md animate-slide-in-right flex-col overflow-y-auto bg-canvas shadow-pop sm:max-w-lg">
+        <header className="glass sticky top-0 z-10 flex items-center justify-between border-b border-line px-5 py-4">
           <div>
-            <p className="text-xs uppercase tracking-wider text-neutral-500">{occurrences.length} event{occurrences.length === 1 ? "" : "s"}</p>
-            <h2 className="text-lg font-semibold">{formatLong(date)}</h2>
+            <p className="text-xs font-semibold uppercase tracking-wider text-brand">
+              {occurrences.length} event{occurrences.length === 1 ? "" : "s"}
+            </p>
+            <h2 className="font-display text-lg font-semibold text-ink">{formatLong(date)}</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100"
+            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -77,7 +81,9 @@ export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelet
 
         <div className="flex flex-col gap-3 p-4">
           {occurrences.length === 0 && !composing && (
-            <p className="text-sm text-neutral-500">No events on this day.</p>
+            <div className="rounded-2xl border border-dashed border-line bg-surface/50 py-10 text-center text-sm text-muted">
+              Nothing planned for this day.
+            </div>
           )}
 
           {occurrences.map((occ) => {
@@ -117,7 +123,7 @@ export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelet
           ) : (
             <button
               onClick={() => setComposing(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-dashed border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:border-neutral-500 hover:bg-neutral-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink/70 transition-colors hover:border-brand hover:bg-brand-soft/40 hover:text-brand"
             >
               <Plus className="h-4 w-4" />
               Add event
@@ -168,7 +174,10 @@ function EventCard({
   const done = occurrenceCompleted;
   return (
     <article
-      className="rounded-md border border-neutral-200 p-3"
+      className={
+        "rounded-xl border border-line bg-surface p-3 shadow-soft transition-shadow hover:shadow-card " +
+        (done ? "opacity-75" : "")
+      }
       style={{ borderLeftWidth: 4, borderLeftColor: cat.accent }}
     >
       <div className="flex items-start gap-3">
@@ -176,28 +185,20 @@ function EventCard({
           type="checkbox"
           checked={done}
           onChange={onToggleComplete}
-          className="mt-0.5 h-4 w-4 cursor-pointer rounded border-neutral-300"
+          className="mt-0.5 h-4 w-4 cursor-pointer rounded border-line accent-brand"
           aria-label={done ? "Mark not done" : "Mark done"}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span
-              className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+              className="rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
               style={{ backgroundColor: cat.bg, color: cat.accent }}
             >
-              {cat.id}
+              {cat.label}
             </span>
-            <h3
-              className={
-                "truncate text-sm font-semibold " +
-                (done ? "text-neutral-400 line-through" : "text-neutral-900")
-              }
-            >
-              {event.title}
-            </h3>
             {event.recurrence && (
               <span
-                className="inline-flex shrink-0 items-center gap-0.5 rounded-sm bg-neutral-100 px-1 py-0.5 text-[9px] font-medium uppercase tracking-wider text-neutral-500"
+                className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-canvas px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted"
                 title={`Repeats ${RECURRENCE_LABELS[event.recurrence.freq]}`}
               >
                 <Repeat className="h-2.5 w-2.5" />
@@ -205,22 +206,48 @@ function EventCard({
               </span>
             )}
           </div>
+          <h3
+            className={
+              "mt-1 text-sm font-semibold " + (done ? "text-muted line-through" : "text-ink")
+            }
+          >
+            {event.title}
+          </h3>
           {event.description && (
             <p
               className={
-                "mt-1 text-xs leading-relaxed " +
-                (done ? "text-neutral-400 line-through" : "text-neutral-600")
+                "mt-1 text-xs leading-relaxed " + (done ? "text-muted line-through" : "text-ink/70")
               }
             >
               {event.description}
             </p>
           )}
+
+          {event.links && event.links.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {event.links.map((l, i) => (
+                <a
+                  key={i}
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex max-w-full items-center gap-1 rounded-lg border border-line bg-canvas px-2 py-1 text-xs font-medium text-brand transition-colors hover:border-brand hover:bg-brand-soft/50"
+                  title={l.url}
+                >
+                  <Link2 className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{l.label}</span>
+                  <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-60" />
+                </a>
+              ))}
+            </div>
+          )}
+
           <ReminderBadge event={event} />
         </div>
         <div className="flex shrink-0 gap-1">
           <button
             onClick={onEdit}
-            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink"
             aria-label="Edit"
             title="Edit"
           >
@@ -228,7 +255,7 @@ function EventCard({
           </button>
           <button
             onClick={onDelete}
-            className="rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600"
             aria-label="Delete"
             title="Delete"
           >
@@ -270,7 +297,7 @@ function ReminderBadge({ event }: { event: CalendarEvent }) {
     .map((d) => (d === 0 ? "day-of" : `${d}d`))
     .join(", ");
   return (
-    <p className="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-700">
+    <p className="mt-1 inline-flex items-center gap-1 text-[10px] text-brand">
       <Bell className="h-3 w-3" />
       Reminds: {labels}
     </p>
@@ -297,6 +324,10 @@ function EventForm({
   // Recurrence. "" = does not repeat; otherwise a RecurrenceFreq. `until` optional.
   const [recurFreq, setRecurFreq] = useState<RecurrenceFreq | "">(initial?.recurrence?.freq ?? "");
   const [recurUntil, setRecurUntil] = useState<string>(initial?.recurrence?.until ?? "");
+
+  // Named links. Draft rows may be partially filled; empty rows are dropped and
+  // URLs are normalized (https:// prefixed) on submit.
+  const [links, setLinks] = useState<EventLink[]>(initial?.links ?? []);
 
   // Reminder customization. Three modes:
   //   "default" → reminderDays === undefined (use global defaults if category eligible)
@@ -325,6 +356,13 @@ function EventForm({
     const recurrence = recurFreq
       ? { freq: recurFreq, until: recurUntil || undefined }
       : undefined;
+    // Normalize + drop empty/invalid link rows.
+    const cleanLinks: EventLink[] = [];
+    for (const l of links) {
+      const url = normalizeUrl(l.url);
+      if (!url) continue;
+      cleanLinks.push({ label: l.label.trim() || hostLabel(url), url });
+    }
     onSubmit({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -333,6 +371,7 @@ function EventForm({
       completed,
       reminderDays,
       recurrence,
+      links: cleanLinks.length ? cleanLinks : undefined,
       // Preserve per-occurrence completion when editing; drop it if recurrence
       // was turned off.
       completedDates: recurrence ? initial?.completedDates : undefined,
@@ -343,9 +382,18 @@ function EventForm({
     setCustomDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
   };
 
+  const addLinkRow = () => setLinks((prev) => [...prev, { label: "", url: "" }]);
+  const updateLink = (i: number, patch: Partial<EventLink>) =>
+    setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const removeLink = (i: number) => setLinks((prev) => prev.filter((_, idx) => idx !== i));
+
+  const fieldClass =
+    "mt-0.5 w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-brand focus:outline-none";
+  const labelClass = "block text-[11px] font-semibold uppercase tracking-wider text-muted";
+
   return (
     <form
-      className="rounded-md border border-neutral-300 bg-neutral-50 p-3"
+      className="animate-scale-in rounded-xl border border-line bg-surface p-3.5 shadow-card"
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -353,32 +401,32 @@ function EventForm({
     >
       <div className="space-y-2">
         <label className="block">
-          <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Title</span>
+          <span className={labelClass}>Title</span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Amgen Scholars deadline"
             autoFocus
-            className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+            className={fieldClass}
           />
         </label>
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Date</span>
+            <span className={labelClass}>Date</span>
             <input
               type="date"
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
-              className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+              className={fieldClass}
             />
           </label>
           <label className="block">
-            <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Category</span>
+            <span className={labelClass}>Category</span>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as CategoryId)}
-              className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+              className={fieldClass}
             >
               {CATEGORY_LIST.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -390,23 +438,64 @@ function EventForm({
         </div>
 
         <label className="block">
-          <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Description (optional)</span>
+          <span className={labelClass}>Description (optional)</span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+            className={fieldClass}
           />
         </label>
+
+        {/* Links */}
+        <div>
+          <span className={labelClass}>Links (optional)</span>
+          <div className="mt-0.5 space-y-1.5">
+            {links.map((l, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <input
+                  value={l.label}
+                  onChange={(e) => updateLink(i, { label: e.target.value })}
+                  placeholder="Label"
+                  className="w-28 shrink-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand focus:outline-none"
+                />
+                <input
+                  value={l.url}
+                  onChange={(e) => updateLink(i, { url: e.target.value })}
+                  placeholder="https://…"
+                  inputMode="url"
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeLink(i)}
+                  className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-red-50 hover:text-red-600"
+                  aria-label="Remove link"
+                  title="Remove link"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addLinkRow}
+              className="inline-flex items-center gap-1 rounded-lg border border-dashed border-line px-2 py-1 text-xs font-medium text-ink/70 transition-colors hover:border-brand hover:text-brand"
+            >
+              <Link2 className="h-3 w-3" />
+              Add link
+            </button>
+          </div>
+        </div>
 
         {/* Recurrence */}
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Repeats</span>
+            <span className={labelClass}>Repeats</span>
             <select
               value={recurFreq}
               onChange={(e) => setRecurFreq(e.target.value as RecurrenceFreq | "")}
-              className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+              className={fieldClass}
             >
               <option value="">Does not repeat</option>
               {(Object.keys(RECURRENCE_LABELS) as RecurrenceFreq[]).map((f) => (
@@ -418,13 +507,13 @@ function EventForm({
           </label>
           {recurFreq && (
             <label className="block">
-              <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Until (optional)</span>
+              <span className={labelClass}>Until (optional)</span>
               <input
                 type="date"
                 value={recurUntil}
                 min={eventDate}
                 onChange={(e) => setRecurUntil(e.target.value)}
-                className="mt-0.5 w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm focus:border-neutral-500 focus:outline-none"
+                className={fieldClass}
               />
             </label>
           )}
@@ -432,8 +521,8 @@ function EventForm({
 
         {/* Per-event reminders */}
         <div>
-          <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">Reminders</span>
-          <div className="mt-0.5 space-y-1.5 rounded-md border border-neutral-300 bg-white p-2 text-sm">
+          <span className={labelClass}>Reminders</span>
+          <div className="mt-0.5 space-y-1.5 rounded-xl border border-line bg-canvas/40 p-2.5 text-sm">
             <label className="flex cursor-pointer items-start gap-2">
               <input
                 type="radio"
@@ -444,7 +533,7 @@ function EventForm({
               />
               <span>
                 <span className="font-medium">Default</span>
-                <span className="block text-xs text-neutral-500">
+                <span className="block text-xs text-muted">
                   7, 3, 1, and 0 days before — only for Deadline / Milestone / UChicago events.
                 </span>
               </span>
@@ -459,7 +548,7 @@ function EventForm({
               />
               <span>
                 <span className="font-medium">None</span>
-                <span className="block text-xs text-neutral-500">No reminders for this event.</span>
+                <span className="block text-xs text-muted">No reminders for this event.</span>
               </span>
             </label>
             <label className="flex cursor-pointer items-start gap-2">
@@ -472,7 +561,7 @@ function EventForm({
               />
               <span className="flex-1">
                 <span className="font-medium">Custom</span>
-                <span className="block text-xs text-neutral-500">
+                <span className="block text-xs text-muted">
                   Pick lead times below. Fires regardless of category.
                 </span>
                 {reminderMode === "custom" && (
@@ -483,10 +572,10 @@ function EventForm({
                         <label
                           key={d}
                           className={
-                            "flex cursor-pointer items-center gap-1.5 rounded-sm border px-1.5 py-1 text-xs " +
+                            "flex cursor-pointer items-center gap-1.5 rounded-lg border px-1.5 py-1 text-xs transition-colors " +
                             (checked
-                              ? "border-blue-400 bg-blue-50 text-blue-800"
-                              : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50")
+                              ? "border-brand bg-brand-soft text-brand"
+                              : "border-line bg-surface text-ink/70 hover:bg-canvas")
                           }
                         >
                           <input
@@ -512,12 +601,12 @@ function EventForm({
         </div>
 
         {initial && (
-          <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <label className="flex items-center gap-2 text-sm text-ink/80">
             <input
               type="checkbox"
               checked={completed}
               onChange={(e) => setCompleted(e.target.checked)}
-              className="h-4 w-4 rounded border-neutral-300"
+              className="h-4 w-4 rounded border-line accent-brand"
             />
             Mark as done
           </label>
@@ -527,14 +616,14 @@ function EventForm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
+            className="rounded-lg px-3 py-1.5 text-sm text-ink/70 transition-colors hover:bg-canvas"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!title.trim() || (reminderMode === "custom" && customDays.length === 0)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-1.5 text-sm font-semibold text-white shadow-soft transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" />
             {initial ? "Save" : "Add"}

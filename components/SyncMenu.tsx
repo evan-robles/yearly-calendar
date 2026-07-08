@@ -63,10 +63,10 @@ export function SyncMenu({ sync }: Props) {
       <button
         onClick={() => setOpen((o) => !o)}
         className={
-          "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm " +
+          "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm shadow-soft transition-colors " +
           (connected
-            ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
-            : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100")
+            ? "border-brand/30 bg-brand-soft text-brand hover:brightness-95"
+            : "border-line bg-surface text-ink/80 hover:bg-canvas hover:text-ink")
         }
         title={connected ? "Cloud sync connected" : "Set up cross-device sync"}
       >
@@ -76,7 +76,7 @@ export function SyncMenu({ sync }: Props) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-80 overflow-hidden rounded-md border border-neutral-200 bg-white p-3 shadow-lg">
+        <div className="absolute right-0 z-30 mt-1.5 w-80 animate-scale-in overflow-hidden rounded-xl border border-line bg-surface p-3 shadow-pop">
           {error && (
             <div className="mb-2 flex items-start gap-1.5 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
