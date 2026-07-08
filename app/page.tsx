@@ -62,16 +62,6 @@ export default function HomePage() {
     [windowStart]
   );
 
-  // Keep the selected `year` inside the visible window when paging. Clamp to the
-  // NEAREST edge (not always the first year) so paging left keeps the selection
-  // on the newly-revealed left year, and paging right keeps it on the right —
-  // otherwise the calendar view can appear to "stick" on the same year.
-  useEffect(() => {
-    const lastYear = windowStart + WINDOW_SIZE - 1;
-    if (year < windowStart) setYear(windowStart);
-    else if (year > lastYear) setYear(lastYear);
-  }, [windowStart, year]);
-
   // Filter predicate over base events (applied before recurrence expansion).
   const matchesFilter = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -133,9 +123,23 @@ export default function HomePage() {
     didScrollRef.current = false; // allow re-scroll to today
   };
 
-  // Left/Right arrow keys page the year window (same as the ◂ / ▸ buttons).
-  // Ignored while typing in a field or when any modal/drawer is open, so arrows
-  // still work normally inside inputs and dialogs.
+  // Go to the previous/next year and slide the visible window so that year stays
+  // in view. This is the single source of truth for both the ◂/▸ buttons and the
+  // arrow keys, so the displayed calendar ALWAYS advances by exactly one year.
+  const goYear = (delta: number) => {
+    setYear((y) => {
+      const next = y + delta;
+      setWindowStart((ws) => {
+        if (next < ws) return next; // scrolled off the left → window starts at it
+        if (next > ws + WINDOW_SIZE - 1) return next - WINDOW_SIZE + 1; // off the right
+        return ws; // still visible → leave the strip where it is
+      });
+      return next;
+    });
+  };
+
+  // Left/Right arrow keys move to the previous/next year (same as the ◂/▸
+  // buttons). Ignored while typing in a field or when any modal/drawer is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -145,7 +149,7 @@ export default function HomePage() {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) return;
       if (selectedDate || bulkDeleteOpen || resetConfirmOpen || labelManagerOpen) return;
       e.preventDefault();
-      setWindowStart((s) => s + (e.key === "ArrowRight" ? 1 : -1));
+      goYear(e.key === "ArrowRight" ? 1 : -1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -251,10 +255,10 @@ export default function HomePage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 rounded-xl border border-line bg-surface p-1 shadow-soft">
             <button
-              onClick={() => setWindowStart((s) => s - 1)}
+              onClick={() => goYear(-1)}
               className="inline-flex items-center rounded-lg p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink"
-              title="Earlier years"
-              aria-label="Earlier years"
+              title="Previous year"
+              aria-label="Previous year"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -273,10 +277,10 @@ export default function HomePage() {
               </button>
             ))}
             <button
-              onClick={() => setWindowStart((s) => s + 1)}
+              onClick={() => goYear(1)}
               className="inline-flex items-center rounded-lg p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink"
-              title="Later years"
-              aria-label="Later years"
+              title="Next year"
+              aria-label="Next year"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

@@ -5,6 +5,10 @@ import type { Label } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
 import { MONTH_NAMES, DAY_HEADERS_MON_FIRST, monthGrid, buildISODate } from "@/lib/date-utils";
 
+// When a day has more than this many events, show fewer full chips and render the
+// remainder as tiny colored dots so the cell stays legible.
+const MAX_CHIPS_LIMIT = 3;
+
 interface MonthProps {
   year: number;
   monthIndex: number;
@@ -103,35 +107,62 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
                 >
                   {day}
                 </span>
-                <span className="flex items-center gap-0.5">
-                  {hasLink && <Link2 className="h-2.5 w-2.5 text-muted" />}
-                  {occs.length > 3 && (
-                    <span className="text-[9px] font-medium text-muted">+{occs.length - 3}</span>
-                  )}
-                </span>
+                {hasLink && <Link2 className="h-2.5 w-2.5 text-muted" />}
               </div>
 
-              <ul className="mt-0.5 min-w-0 space-y-0.5">
-                {occs.slice(0, 3).map((o) => {
-                  const cat = getLabel(o.event.category);
-                  return (
-                    <li
-                      key={o.event.id + o.date}
-                      className={
-                        "truncate rounded-[3px] px-1 py-px text-[9px] font-medium leading-tight " +
-                        (o.completed ? "text-muted line-through" : "text-ink/90")
-                      }
-                      style={{
-                        backgroundColor: o.completed ? "transparent" : cat.bg + "D0",
-                        borderLeft: `2.5px solid ${cat.accent}`,
-                      }}
-                      title={o.event.title + (o.event.description ? ` — ${o.event.description}` : "")}
-                    >
-                      {o.event.title}
-                    </li>
-                  );
-                })}
-              </ul>
+              {/* Show up to MAX_CHIPS full chips; represent the rest as tiny
+                  colored dots (one per remaining event, colored by label, hollow
+                  when completed) so a busy day stays legible and countable. */}
+              {(() => {
+                const MAX_CHIPS = occs.length > MAX_CHIPS_LIMIT ? MAX_CHIPS_LIMIT - 1 : occs.length;
+                const chips = occs.slice(0, MAX_CHIPS);
+                const dots = occs.slice(MAX_CHIPS);
+                return (
+                  <>
+                    <ul className="mt-0.5 min-w-0 space-y-0.5">
+                      {chips.map((o) => {
+                        const cat = getLabel(o.event.category);
+                        return (
+                          <li
+                            key={o.event.id + o.date}
+                            className={
+                              "truncate rounded-[3px] px-1 py-px text-[9px] font-medium leading-tight " +
+                              (o.completed ? "text-muted line-through" : "text-ink/90")
+                            }
+                            style={{
+                              backgroundColor: o.completed ? "transparent" : cat.bg + "D0",
+                              borderLeft: `2.5px solid ${cat.accent}`,
+                            }}
+                            title={o.event.title + (o.event.description ? ` — ${o.event.description}` : "")}
+                          >
+                            {o.event.title}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {dots.length > 0 && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {dots.map((o) => {
+                          const cat = getLabel(o.event.category);
+                          return (
+                            <span
+                              key={o.event.id + o.date}
+                              className="h-2 w-2 rounded-full"
+                              style={
+                                o.completed
+                                  ? { border: `1.5px solid ${cat.accent}`, opacity: 0.5 }
+                                  : { backgroundColor: cat.accent }
+                              }
+                              title={o.event.title + (o.completed ? " (done)" : "")}
+                            />
+                          );
+                        })}
+                        <span className="text-[9px] font-semibold text-muted">{dots.length}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </button>
           );
         })}
