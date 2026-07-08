@@ -130,6 +130,24 @@ export default function HomePage() {
     didScrollRef.current = false; // allow re-scroll to today
   };
 
+  // Left/Right arrow keys page the year window (same as the ◂ / ▸ buttons).
+  // Ignored while typing in a field or when any modal/drawer is open, so arrows
+  // still work normally inside inputs and dialogs.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) return;
+      if (selectedDate || bulkDeleteOpen || resetConfirmOpen || labelManagerOpen) return;
+      e.preventDefault();
+      setWindowStart((s) => s + (e.key === "ArrowRight" ? 1 : -1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedDate, bulkDeleteOpen, resetConfirmOpen, labelManagerOpen]);
+
   // Scroll today's cell into view once, after first hydration, but only when
   // we're on the year that actually contains today.
   const didScrollRef = useRef(false);
