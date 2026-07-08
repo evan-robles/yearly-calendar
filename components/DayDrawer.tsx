@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import { X, Plus, Trash2, Save, Pencil, Bell, BellOff, Repeat, Link2, ExternalLink } from "lucide-react";
 import {
-  CATEGORIES,
-  CATEGORY_LIST,
   RECURRENCE_LABELS,
   type CalendarEvent,
   type CategoryId,
   type EventLink,
+  type Label,
   type RecurrenceFreq,
 } from "@/lib/types";
 import { formatLong } from "@/lib/date-utils";
@@ -23,6 +22,10 @@ type EventDraft = Omit<CalendarEvent, "id" | "updatedAt">;
 interface Props {
   date: string; // ISO YYYY-MM-DD
   occurrences: Occurrence[];
+  labels: Label[];
+  getLabel: (id: string) => Label;
+  /** Open the label manager (used by the form's "New label…" affordance). */
+  onManageLabels: () => void;
   onClose: () => void;
   onAdd: (draft: EventDraft) => void;
   onUpdate: (id: string, updates: Partial<Omit<CalendarEvent, "id">>) => void;
@@ -31,7 +34,18 @@ interface Props {
   onToggleComplete: (id: string, date: string) => void;
 }
 
-export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelete, onToggleComplete }: Props) {
+export function DayDrawer({
+  date,
+  occurrences,
+  labels,
+  getLabel,
+  onManageLabels,
+  onClose,
+  onAdd,
+  onUpdate,
+  onDelete,
+  onToggleComplete,
+}: Props) {
   const [composing, setComposing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<CalendarEvent | null>(null);
@@ -93,6 +107,8 @@ export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelet
                 key={event.id + occ.date}
                 initial={event}
                 date={date}
+                labels={labels}
+                onManageLabels={onManageLabels}
                 onCancel={() => setEditingId(null)}
                 onSubmit={(draft) => {
                   onUpdate(event.id, draft);
@@ -103,6 +119,7 @@ export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelet
               <EventCard
                 key={event.id + occ.date}
                 event={event}
+                cat={getLabel(event.category)}
                 occurrenceCompleted={occ.completed}
                 onEdit={() => setEditingId(event.id)}
                 onDelete={() => setPendingDelete(event)}
@@ -114,6 +131,8 @@ export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelet
           {composing ? (
             <EventForm
               date={date}
+              labels={labels}
+              onManageLabels={onManageLabels}
               onCancel={() => setComposing(false)}
               onSubmit={(draft) => {
                 onAdd(draft);
@@ -158,19 +177,20 @@ export function DayDrawer({ date, occurrences, onClose, onAdd, onUpdate, onDelet
 
 function EventCard({
   event,
+  cat,
   occurrenceCompleted,
   onEdit,
   onDelete,
   onToggleComplete,
 }: {
   event: CalendarEvent;
+  cat: Label;
   /** Completion of THIS occurrence (differs from event.completed for series). */
   occurrenceCompleted: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onToggleComplete: () => void;
 }) {
-  const cat = CATEGORIES[event.category];
   const done = occurrenceCompleted;
   return (
     <article
@@ -242,7 +262,7 @@ function EventCard({
             </div>
           )}
 
-          <ReminderBadge event={event} />
+          <ReminderBadge event={event} cat={cat} />
         </div>
         <div className="flex shrink-0 gap-1">
           <button
@@ -271,13 +291,13 @@ function EventCard({
 // Reminder Badge — small inline summary of an event's reminder settings.
 // ──────────────────────────────────────────────────────────────────────────
 
-function ReminderBadge({ event }: { event: CalendarEvent }) {
-  // Default reminders (no override) — only shown for time-sensitive categories
-  // since otherwise nothing fires.
+function ReminderBadge({ event, cat }: { event: CalendarEvent; cat: Label }) {
+  // Default reminders (no override) — only shown when the event's LABEL is set to
+  // auto-remind, since otherwise nothing fires.
   if (event.reminderDays === undefined) {
-    if (!["DEADLINE", "MILESTONE", "UCHICAGO"].includes(event.category)) return null;
+    if (!cat.remindByDefault) return null;
     return (
-      <p className="mt-1 inline-flex items-center gap-1 text-[10px] text-neutral-500">
+      <p className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted">
         <Bell className="h-3 w-3" />
         Default reminders (7, 3, 1, day-of)
       </p>
@@ -285,7 +305,7 @@ function ReminderBadge({ event }: { event: CalendarEvent }) {
   }
   if (event.reminderDays.length === 0) {
     return (
-      <p className="mt-1 inline-flex items-center gap-1 text-[10px] text-neutral-400">
+      <p className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted">
         <BellOff className="h-3 w-3" />
         No reminders
       </p>
@@ -307,17 +327,24 @@ function ReminderBadge({ event }: { event: CalendarEvent }) {
 function EventForm({
   initial,
   date,
+  labels,
+  onManageLabels,
   onSubmit,
   onCancel,
 }: {
   initial?: CalendarEvent;
   date: string;
+  labels: Label[];
+  onManageLabels: () => void;
   onSubmit: (draft: EventDraft) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [category, setCategory] = useState<CategoryId>(initial?.category ?? "REMINDER");
+  // Default to the event's own label, else the first available label, else "".
+  const [category, setCategory] = useState<CategoryId>(
+    initial?.category ?? labels[0]?.id ?? ""
+  );
   const [eventDate, setEventDate] = useState<string>(initial?.date ?? date);
   const [completed, setCompleted] = useState<boolean>(initial?.completed ?? false);
 
@@ -422,18 +449,40 @@ function EventForm({
             />
           </label>
           <label className="block">
-            <span className={labelClass}>Category</span>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as CategoryId)}
-              className={fieldClass}
-            >
-              {CATEGORY_LIST.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.id} — {c.label}
-                </option>
-              ))}
-            </select>
+            <span className={labelClass}>Label</span>
+            {labels.length > 0 ? (
+              <select
+                value={category}
+                onChange={(e) => {
+                  if (e.target.value === "__manage__") {
+                    onManageLabels();
+                    return;
+                  }
+                  setCategory(e.target.value as CategoryId);
+                }}
+                className={fieldClass}
+              >
+                {/* If the event references a label that no longer exists, keep it
+                    selectable so editing doesn't silently reassign it. */}
+                {category && !labels.some((l) => l.id === category) && (
+                  <option value={category}>(unlabeled)</option>
+                )}
+                {labels.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+                <option value="__manage__">＋ Manage labels…</option>
+              </select>
+            ) : (
+              <button
+                type="button"
+                onClick={onManageLabels}
+                className={fieldClass + " text-left text-brand hover:bg-brand-soft/40"}
+              >
+                ＋ Create a label…
+              </button>
+            )}
           </label>
         </div>
 
@@ -534,7 +583,7 @@ function EventForm({
               <span>
                 <span className="font-medium">Default</span>
                 <span className="block text-xs text-muted">
-                  7, 3, 1, and 0 days before — only for Deadline / Milestone / UChicago events.
+                  7, 3, 1, and 0 days before — only if this event&apos;s label has &ldquo;Auto-remind&rdquo; on.
                 </span>
               </span>
             </label>

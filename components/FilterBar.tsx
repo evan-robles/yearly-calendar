@@ -1,12 +1,14 @@
 "use client";
 
 import { Search, X } from "lucide-react";
-import { CATEGORY_LIST, type CategoryId } from "@/lib/types";
+import type { CategoryId, Label } from "@/lib/types";
 
 interface Props {
   query: string;
   onQuery: (q: string) => void;
-  /** Set of active category ids. Empty set = show all. */
+  /** The user's labels, to render filter chips. */
+  labels: Label[];
+  /** Set of active label ids. Empty set = show all. */
   activeCategories: Set<CategoryId>;
   onToggleCategory: (id: CategoryId) => void;
   onClear: () => void;
@@ -23,6 +25,7 @@ interface Props {
 export function FilterBar({
   query,
   onQuery,
+  labels,
   activeCategories,
   onToggleCategory,
   onClear,
@@ -42,7 +45,7 @@ export function FilterBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-1">
-        {CATEGORY_LIST.map((c) => {
+        {labels.map((c) => {
           const active = activeCategories.has(c.id);
           return (
             <button

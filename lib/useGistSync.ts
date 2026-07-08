@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CalendarEvent } from "./types";
-import { validateEvents } from "./validation";
-import { wrapPayload, STORAGE_VERSION } from "./migrate";
+import type { CalendarEvent, Label } from "./types";
+import { validateEvents, validateLabels } from "./validation";
+import { STORAGE_VERSION } from "./migrate";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GitHub Gist sync
@@ -75,10 +75,21 @@ async function describeError(res: Response): Promise<string> {
   return `GitHub API error ${res.status}${detail}.`;
 }
 
+/** Bridge to the labels store so sync can round-trip labels alongside events.
+ *  Labels use whole-set newest-wins by `stamp` (they're small + user-managed). */
+export interface LabelBridge {
+  labels: Label[];
+  stamp: string;
+  /** Given the remote labels+stamp, decide the winner and apply it locally.
+   *  Returns the labels that should be written back to the gist. */
+  reconcile: (remoteLabels: Label[], remoteStamp: string) => { labels: Label[]; stamp: string };
+}
+
 export function useGistSync(
   localEvents: CalendarEvent[],
   hydrated: boolean,
-  applyMerged: (incoming: CalendarEvent[]) => CalendarEvent[]
+  applyMerged: (incoming: CalendarEvent[]) => CalendarEvent[],
+  labelBridge: LabelBridge
 ) {
   const [settings, setSettings] = useState<SyncSettings>(EMPTY_SETTINGS);
   const [loaded, setLoaded] = useState(false);
@@ -118,10 +129,17 @@ export function useGistSync(
     setSettings((s) => ({ ...s, autoSync }));
   }, []);
 
-  /** Serialize the current events into the gist file body. */
-  const fileContent = useCallback((events: CalendarEvent[]) => {
-    return JSON.stringify({ ...wrapPayload(events), version: STORAGE_VERSION }, null, 2);
-  }, []);
+  /** Serialize events + labels into the gist file body (payload v3). */
+  const fileContent = useCallback(
+    (events: CalendarEvent[], labels: Label[], labelsUpdatedAt: string) => {
+      return JSON.stringify(
+        { version: STORAGE_VERSION, events, labels, labelsUpdatedAt },
+        null,
+        2
+      );
+    },
+    []
+  );
 
   /** Create a new PRIVATE gist seeded with the current local events. An explicit
    *  `tokenOverride` avoids a state race when connecting right after the token
@@ -141,7 +159,7 @@ export function useGistSync(
         body: JSON.stringify({
           description: GIST_DESCRIPTION,
           public: false,
-          files: { [GIST_FILENAME]: { content: fileContent(localEvents) } },
+          files: { [GIST_FILENAME]: { content: fileContent(localEvents, labelBridge.labels, labelBridge.stamp) } },
         }),
       });
       if (!res.ok) {
@@ -158,7 +176,7 @@ export function useGistSync(
       setStatus("error");
       return false;
     }
-  }, [settings.token, localEvents, fileContent]);
+  }, [settings.token, localEvents, fileContent, labelBridge.labels, labelBridge.stamp]);
 
   /** Attach to an existing gist id (validates it holds our file). */
   const useExistingGist = useCallback(
@@ -196,8 +214,12 @@ export function useGistSync(
     [settings.token]
   );
 
-  /** Fetch + validate the remote events. Returns null on error (error state set). */
-  const pull = useCallback(async (): Promise<CalendarEvent[] | null> => {
+  /** Fetch + validate the remote events AND labels. Returns null on error. */
+  const pull = useCallback(async (): Promise<{
+    events: CalendarEvent[];
+    labels: Label[];
+    labelsStamp: string;
+  } | null> => {
     if (!connected) return null;
     const res = await fetch(`${API}/gists/${settings.gistId}`, { headers: ghHeaders(settings.token) });
     if (!res.ok) {
@@ -213,7 +235,12 @@ export function useGistSync(
       return null;
     }
     try {
-      return validateEvents(JSON.parse(raw), new Date().toISOString());
+      const parsed = JSON.parse(raw);
+      return {
+        events: validateEvents(parsed, new Date().toISOString()),
+        labels: validateLabels(parsed?.labels),
+        labelsStamp: typeof parsed?.labelsUpdatedAt === "string" ? parsed.labelsUpdatedAt : "1970-01-01T00:00:00.000Z",
+      };
     } catch (e) {
       setError(`Remote data is invalid: ${e instanceof Error ? e.message : "parse error"}.`);
       setStatus("error");
@@ -221,14 +248,16 @@ export function useGistSync(
     }
   }, [connected, settings.gistId, settings.token]);
 
-  /** Overwrite the remote file with the given events. */
+  /** Overwrite the remote file with the given events + labels. */
   const push = useCallback(
-    async (events: CalendarEvent[]): Promise<boolean> => {
+    async (events: CalendarEvent[], labels: Label[], labelsStamp: string): Promise<boolean> => {
       if (!connected) return false;
       const res = await fetch(`${API}/gists/${settings.gistId}`, {
         method: "PATCH",
         headers: ghHeaders(settings.token),
-        body: JSON.stringify({ files: { [GIST_FILENAME]: { content: fileContent(events) } } }),
+        body: JSON.stringify({
+          files: { [GIST_FILENAME]: { content: fileContent(events, labels, labelsStamp) } },
+        }),
       });
       if (!res.ok) {
         setError(await describeError(res));
@@ -253,13 +282,16 @@ export function useGistSync(
     setError(null);
     const remote = await pull();
     if (remote === null) return false; // error already set
-    const merged = applyMerged(remote); // updates local state, returns merged list
-    const ok = await push(merged);
+    // Events: per-id newest-wins (updates local state, returns merged list).
+    const mergedEvents = applyMerged(remote.events);
+    // Labels: whole-set newest-wins by stamp (applied locally, returned to push).
+    const mergedLabels = labelBridge.reconcile(remote.labels, remote.labelsStamp);
+    const ok = await push(mergedEvents, mergedLabels.labels, mergedLabels.stamp);
     if (!ok) return false;
     setSettings((s) => ({ ...s, lastSyncedAt: new Date().toISOString() }));
     setStatus("ok");
     return true;
-  }, [connected, pull, push, applyMerged]);
+  }, [connected, pull, push, applyMerged, labelBridge]);
 
   // Auto-sync: debounced push-through-sync after local edits, plus a pull on
   // first load. Kept conservative (3s debounce) to avoid hammering the API.

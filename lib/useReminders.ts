@@ -1,15 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { CalendarEvent, CategoryId } from "./types";
+import type { CalendarEvent, Label } from "./types";
 import { todayISO, daysBetween, addDaysISO } from "./date-utils";
 import { expandEvent } from "./recurrence";
 
 const PREF_KEY = "yearly-calendar:reminders:v1";
 const SHOWN_KEY = "yearly-calendar:reminders:shown:v1";
-
-/** Categories whose events get reminders by default (when reminderDays is unset). */
-const DEFAULT_REMINDER_CATEGORIES: CategoryId[] = ["DEADLINE", "MILESTONE", "UCHICAGO"];
 
 /** Default lead times (days) for events without an override. 0 = day of. */
 export const DEFAULT_LEAD_DAYS = [7, 3, 1, 0];
@@ -23,16 +20,22 @@ const SWEEP_INTERVAL_MS = 60_000;
 // The longest default/optional lead time is 60 days, so 70 gives comfortable margin.
 const REMINDER_LOOKAHEAD_DAYS = 70;
 
-/** Resolve the lead-time list for one event. null = no reminders for this event. */
-function resolveLeadTimes(event: CalendarEvent): number[] | null {
+/** Resolve the lead-time list for one event. null = no reminders for this event.
+ *  A per-event `reminderDays` override wins; otherwise the event's LABEL decides
+ *  (via its `remindByDefault` flag), using the default schedule. */
+function resolveLeadTimes(event: CalendarEvent, getLabel: (id: string) => Label): number[] | null {
   if (event.reminderDays !== undefined) {
     return event.reminderDays.length === 0 ? null : event.reminderDays;
   }
-  if (!DEFAULT_REMINDER_CATEGORIES.includes(event.category)) return null;
+  if (!getLabel(event.category).remindByDefault) return null;
   return DEFAULT_LEAD_DAYS;
 }
 
-export function useReminders(events: CalendarEvent[], hydrated: boolean) {
+export function useReminders(
+  events: CalendarEvent[],
+  hydrated: boolean,
+  getLabel: (id: string) => Label
+) {
   const [enabled, setEnabled] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [supported, setSupported] = useState(true);
@@ -86,7 +89,7 @@ export function useReminders(events: CalendarEvent[], hydrated: boolean) {
 
     let changed = false;
     for (const event of events) {
-      const leadTimes = resolveLeadTimes(event);
+      const leadTimes = resolveLeadTimes(event, getLabel);
       if (!leadTimes) continue;
 
       // Expand recurring events into upcoming occurrences; a non-recurring event
@@ -129,7 +132,7 @@ export function useReminders(events: CalendarEvent[], hydrated: boolean) {
         // ignore
       }
     }
-  }, [events, hydrated, enabled, supported, tick]);
+  }, [events, hydrated, enabled, supported, tick, getLabel]);
 
   const requestPermission = useCallback(async () => {
     if (!supported) return false;

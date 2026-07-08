@@ -1,7 +1,7 @@
 "use client";
 
 import { Link2 } from "lucide-react";
-import { CATEGORIES } from "@/lib/types";
+import type { Label } from "@/lib/types";
 import type { Occurrence } from "@/lib/recurrence";
 import { MONTH_NAMES, DAY_HEADERS_MON_FIRST, monthGrid, buildISODate } from "@/lib/date-utils";
 
@@ -9,11 +9,12 @@ interface MonthProps {
   year: number;
   monthIndex: number;
   occurrencesByDate: Map<string, Occurrence[]>;
+  getLabel: (id: string) => Label;
   onSelectDay: (isoDate: string) => void;
   today: string;
 }
 
-export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, today }: MonthProps) {
+export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSelectDay, today }: MonthProps) {
   const grid = monthGrid(year, monthIndex);
   const isCurrentMonth = today.slice(0, 7) === `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
 
@@ -55,10 +56,10 @@ export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, to
           const occs = occurrencesByDate.get(iso) ?? [];
           const hasLink = occs.some((o) => (o.event.links?.length ?? 0) > 0);
 
-          // Highest-priority category color for the cell tint.
+          // Highest-priority label color for the cell tint.
           const topCategory =
             occs.length > 0
-              ? occs.map((o) => CATEGORIES[o.event.category]).sort((a, b) => a.priority - b.priority)[0]
+              ? occs.map((o) => getLabel(o.event.category)).sort((a, b) => a.priority - b.priority)[0]
               : null;
 
           const isToday = iso === today;
@@ -112,7 +113,7 @@ export function MonthView({ year, monthIndex, occurrencesByDate, onSelectDay, to
 
               <ul className="mt-0.5 space-y-0.5">
                 {occs.slice(0, 3).map((o) => {
-                  const cat = CATEGORIES[o.event.category];
+                  const cat = getLabel(o.event.category);
                   return (
                     <li
                       key={o.event.id + o.date}

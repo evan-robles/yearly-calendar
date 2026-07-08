@@ -4,14 +4,47 @@
 // malformed payload fails loudly (or is repaired predictably) instead of quietly
 // corrupting app state.
 
-import { CATEGORIES, type CalendarEvent, type CategoryId, type EventLink, type Recurrence, type RecurrenceFreq } from "./types";
+import { type CalendarEvent, type CategoryId, type EventLink, type Label, type Recurrence, type RecurrenceFreq } from "./types";
 
-const VALID_CATS = new Set(Object.keys(CATEGORIES));
 const VALID_FREQS = new Set<RecurrenceFreq>(["WEEKLY", "MONTHLY", "YEARLY", "SEMESTER"]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const HEX_COLOR = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 export function isISODate(v: unknown): v is string {
   return typeof v === "string" && ISO_DATE.test(v);
+}
+
+/** Coerce a value to a hex color, or return the fallback if it isn't one. */
+function coerceHex(v: unknown, fallback: string): string {
+  return typeof v === "string" && HEX_COLOR.test(v.trim()) ? v.trim() : fallback;
+}
+
+/**
+ * Validate & coerce a raw labels array. Labels are user data (from localStorage
+ * or a synced gist), so bad entries are repaired (colors) or dropped (missing
+ * id/name) rather than throwing — a malformed label set must never brick the app.
+ */
+export function validateLabels(raw: unknown): Label[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Label[] = [];
+  let autoPriority = 1;
+  for (const item of raw as unknown[]) {
+    if (!item || typeof item !== "object") continue;
+    const l = item as Partial<Label>;
+    const id = typeof l.id === "string" && l.id ? l.id : null;
+    const name = typeof l.label === "string" && l.label.trim() ? l.label.trim() : null;
+    if (!id || !name) continue;
+    out.push({
+      id,
+      label: name,
+      bg: coerceHex(l.bg, "#E5E7EB"),
+      accent: coerceHex(l.accent, "#6B7280"),
+      priority: typeof l.priority === "number" && Number.isFinite(l.priority) ? l.priority : autoPriority,
+      remindByDefault: Boolean(l.remindByDefault),
+    });
+    autoPriority++;
+  }
+  return out;
 }
 
 /**
@@ -80,9 +113,11 @@ export function coerceEvent(raw: unknown, index: number, nowISO: string): Calend
   if (typeof e.id !== "string" || !e.id) throw new Error(`${where}: missing 'id'.`);
   if (!isISODate(e.date)) throw new Error(`${where} (${e.id}): invalid 'date' (expected YYYY-MM-DD).`);
   if (typeof e.title !== "string" || !e.title) throw new Error(`${where} (${e.id}): missing 'title'.`);
-  if (typeof e.category !== "string" || !VALID_CATS.has(e.category)) {
-    throw new Error(`${where} (${e.id}): unknown category '${String(e.category)}'.`);
-  }
+  // `category` is a label id — any non-empty string. An id with no matching label
+  // renders via the UNKNOWN_LABEL fallback (see useLabels.getLabel); we tolerate
+  // it here rather than reject, so deleting a label never invalidates its events.
+  // An empty/missing category is coerced to the fallback id.
+  const category: CategoryId = typeof e.category === "string" && e.category ? e.category : "__unknown__";
 
   const reminderDays = Array.isArray(e.reminderDays)
     ? (e.reminderDays as unknown[]).filter((d): d is number => typeof d === "number" && d >= 0)
@@ -96,7 +131,7 @@ export function coerceEvent(raw: unknown, index: number, nowISO: string): Calend
     id: e.id,
     date: e.date,
     title: e.title,
-    category: e.category as CategoryId,
+    category,
     description: typeof e.description === "string" ? e.description : undefined,
     completed: Boolean(e.completed),
     links: coerceLinks(e.links),

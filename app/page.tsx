@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, RotateCcw, Trash2, ChevronLeft, ChevronRight, CalendarClock } from "lucide-react";
+import { CalendarDays, RotateCcw, Trash2, ChevronLeft, ChevronRight, CalendarClock, Tag } from "lucide-react";
 import { useEvents } from "@/lib/useEvents";
+import { useLabels } from "@/lib/useLabels";
 import { useReminders } from "@/lib/useReminders";
 import { useGistSync } from "@/lib/useGistSync";
 import { todayISO, startOfYearISO, endOfYearISO } from "@/lib/date-utils";
@@ -16,6 +17,7 @@ import { BackupMenu } from "@/components/BackupMenu";
 import { RemindersToggle } from "@/components/RemindersToggle";
 import { SyncMenu } from "@/components/SyncMenu";
 import { FilterBar } from "@/components/FilterBar";
+import { LabelManager } from "@/components/LabelManager";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // The year of "today", computed at module load. Used only to seed the initial
@@ -26,8 +28,21 @@ const WINDOW_SIZE = 4; // number of year tabs shown at once
 
 export default function HomePage() {
   const ev = useEvents();
-  const reminders = useReminders(ev.events, ev.hydrated);
-  const sync = useGistSync(ev.events, ev.hydrated, ev.mergeNewestWins);
+  const lbl = useLabels();
+  const reminders = useReminders(ev.events, ev.hydrated, lbl.getLabel);
+  const sync = useGistSync(ev.events, ev.hydrated, ev.mergeNewestWins, {
+    labels: lbl.labels,
+    stamp: lbl.labelsUpdatedAt,
+    // Whole-set newest-wins: the side with the later stamp wins outright.
+    reconcile: (remoteLabels, remoteStamp) => {
+      if (Date.parse(remoteStamp) > Date.parse(lbl.labelsUpdatedAt)) {
+        lbl.replaceLabels(remoteLabels, remoteStamp);
+        return { labels: remoteLabels, stamp: remoteStamp };
+      }
+      return { labels: lbl.labels, stamp: lbl.labelsUpdatedAt };
+    },
+  });
+  const [labelManagerOpen, setLabelManagerOpen] = useState(false);
 
   // Sliding 4-year window. `windowStart` is the first visible year; the user can
   // page it backward/forward or jump back to "today".
@@ -137,6 +152,13 @@ export default function HomePage() {
     return { all, done };
   }, [ev.events]);
 
+  // Event count per label id (drives the "used by N events" warning on delete).
+  const labelUsage = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of ev.events) m.set(e.category, (m.get(e.category) ?? 0) + 1);
+    return m;
+  }, [ev.events]);
+
   const btnBase =
     "inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink/80 shadow-soft transition-colors hover:bg-canvas hover:text-ink";
 
@@ -168,6 +190,10 @@ export default function HomePage() {
               onTest={reminders.testNotification}
             />
             <SyncMenu sync={sync} />
+            <button onClick={() => setLabelManagerOpen(true)} className={btnBase} title="Create and manage labels">
+              <Tag className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Labels</span>
+            </button>
             <BackupMenu events={ev.events} onReplace={ev.replaceEvents} onMerge={ev.mergeEvents} />
             <button
               onClick={() => setBulkDeleteOpen(true)}
@@ -233,7 +259,7 @@ export default function HomePage() {
             Today
           </button>
           <div className="ml-auto">
-            <CategoryLegend />
+            <CategoryLegend labels={lbl.labels} onManage={() => setLabelManagerOpen(true)} />
           </div>
         </div>
 
@@ -241,6 +267,7 @@ export default function HomePage() {
         <FilterBar
           query={query}
           onQuery={setQuery}
+          labels={lbl.labels}
           activeCategories={activeCategories}
           onToggleCategory={toggleCategory}
           onClear={clearFilters}
@@ -253,6 +280,7 @@ export default function HomePage() {
           <YearCalendar
             year={year}
             occurrencesByDate={occurrencesByDate}
+            getLabel={lbl.getLabel}
             onSelectDay={setSelectedDate}
             today={TODAY}
           />
@@ -269,6 +297,9 @@ export default function HomePage() {
         <DayDrawer
           date={selectedDate}
           occurrences={selectedOccurrences}
+          labels={lbl.labels}
+          getLabel={lbl.getLabel}
+          onManageLabels={() => setLabelManagerOpen(true)}
           onClose={() => setSelectedDate(null)}
           onAdd={ev.addEvent}
           onUpdate={ev.updateEvent}
@@ -303,6 +334,20 @@ export default function HomePage() {
             ev.resetToSeed();
             setResetConfirmOpen(false);
           }}
+        />
+      )}
+
+      {/* Label manager */}
+      {labelManagerOpen && (
+        <LabelManager
+          labels={lbl.labels}
+          usageById={labelUsage}
+          onAdd={lbl.addLabel}
+          onUpdate={lbl.updateLabel}
+          onDelete={lbl.deleteLabel}
+          onMove={lbl.moveLabel}
+          onReset={lbl.resetLabels}
+          onClose={() => setLabelManagerOpen(false)}
         />
       )}
       </main>
