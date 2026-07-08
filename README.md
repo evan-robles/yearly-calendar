@@ -95,6 +95,47 @@ lib/
   date-utils.ts    Pure date helpers (month grid, ISO formatting).
 ```
 
+## Cross-device sync (GitHub Gist)
+
+By default all data is browser-local. To make your events follow you across
+devices, the **Sync** menu in the header mirrors them to a **private GitHub
+gist**.
+
+**Setup**
+
+1. Click **Sync → Create a token with only the “gist” scope**. This opens
+   GitHub's token page pre-filled with the single `gist` scope. Generate the
+   token and copy it.
+2. Paste the token into the Sync panel and click **Create & connect**. The app
+   creates a private gist named `yearly-calendar.json` and remembers its id.
+3. On another device, open the site, click **Sync → Use existing gist**, paste
+   the same token and the gist id (shown in the panel / the gist URL), and
+   connect.
+4. Use **Sync now** to reconcile, or enable **Auto-sync** to pull on load and
+   push a few seconds after each change.
+
+**How conflicts are resolved.** Each event carries an `updatedAt` timestamp.
+Syncing pulls the remote list, merges it with the local one keeping whichever
+copy of each event (by `id`) was edited most recently (**newest-wins**), pushes
+the merged result back, and updates local state. Deletions are not tombstoned —
+if you delete an event on one device but it still exists (newer) on another,
+sync can bring it back; delete on both or re-sync after deleting.
+
+**Security model.**
+
+- The token is stored **only in this browser's `localStorage`** and is sent
+  **only to `api.github.com` over HTTPS**. It is never committed to the repo,
+  never logged, and never sent anywhere else.
+- The gist is **private**. Only someone with your token can read it.
+- Use a **fine-grained or classic token limited to the `gist` scope** — it
+  cannot touch your repos or other data.
+- **Disconnect** clears the token from the browser. To fully revoke, delete the
+  token at <https://github.com/settings/tokens> (and delete the gist if desired).
+
+> This is the standard token-based pattern for syncing a static (serverless)
+> app. If you'd prefer the token never live in the browser, that requires adding
+> a backend, which trades away the free static hosting.
+
 ## Customizing
 
 - **Add or rename categories** — edit `lib/types.ts`. The `CATEGORIES` map is
@@ -112,10 +153,12 @@ lib/
 
 ## Notes & caveats
 
-- This is a single-user, browser-local app. No auth, no sync between devices.
-  If you want multi-device sync, swap `useEvents` for a hook that talks to a
-  database (Supabase, Vercel Postgres, etc.) — the rest of the UI doesn't need
-  to change.
+- This is a single-user app. Data is browser-local by default; optional
+  cross-device sync is available via a private GitHub gist (see **Cross-device
+  sync** above). There is no multi-user auth — the gist is your personal store.
+  For real multi-user/real-time sync you'd swap `useEvents`/`useGistSync` for a
+  hook that talks to a database (Supabase, Vercel Postgres, etc.); the rest of
+  the UI doesn't need to change.
 - `localStorage` has a ~5MB cap; this app uses well under 1KB per event.
 - Hydration: `useEvents` reads localStorage in `useEffect` so SSR and CSR
   agree on the initial render. While hydrating, the page shows a brief

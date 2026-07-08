@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, RotateCcw, Trash2 } from "lucide-react";
 import { useEvents } from "@/lib/useEvents";
 import { useReminders } from "@/lib/useReminders";
+import { useGistSync } from "@/lib/useGistSync";
 import { todayISO } from "@/lib/date-utils";
 import { YearCalendar } from "@/components/YearCalendar";
 import { CategoryLegend } from "@/components/CategoryLegend";
@@ -11,6 +12,7 @@ import { DayDrawer } from "@/components/DayDrawer";
 import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
 import { BackupMenu } from "@/components/BackupMenu";
 import { RemindersToggle } from "@/components/RemindersToggle";
+import { SyncMenu } from "@/components/SyncMenu";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // 4-year window starting from "now" (the year of today). Recomputed at module
@@ -23,6 +25,7 @@ const YEARS = [START_YEAR, START_YEAR + 1, START_YEAR + 2, START_YEAR + 3];
 export default function HomePage() {
   const ev = useEvents();
   const reminders = useReminders(ev.events, ev.hydrated);
+  const sync = useGistSync(ev.events, ev.hydrated, ev.mergeNewestWins);
   const [year, setYear] = useState<number>(START_YEAR);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -73,6 +76,7 @@ export default function HomePage() {
             onToggle={reminders.toggle}
             onTest={reminders.testNotification}
           />
+          <SyncMenu sync={sync} />
           <BackupMenu
             events={ev.events}
             onReplace={ev.replaceEvents}
