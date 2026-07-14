@@ -511,7 +511,7 @@ function EventForm({
                 <input
                   value={l.url}
                   onChange={(e) => updateLink(i, { url: e.target.value })}
-                  placeholder="https://…"
+                  placeholder="https://…  or  file:///…"
                   inputMode="url"
                   className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink focus:border-brand focus:outline-none"
                 />
@@ -534,6 +534,13 @@ function EventForm({
               <Link2 className="h-3 w-3" />
               Add link
             </button>
+            {links.some((l) => l.url.trim().toLowerCase().startsWith("file:")) && (
+              <p className="mt-1 text-[11px] leading-snug text-muted">
+                Local <span className="font-mono">file://</span> links open only when
+                this calendar is opened locally &mdash; browsers block them from the
+                live (https) site.
+              </p>
+            )}
           </div>
         </div>
 

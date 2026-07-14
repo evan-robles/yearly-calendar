@@ -49,8 +49,14 @@ export function validateLabels(raw: unknown): Label[] {
 
 /**
  * Normalize a user/imported URL: trim, and if it has no scheme, assume https.
- * Rejects anything that can't be parsed as an http(s) URL (returns null) so we
+ * Allows http(s) and file:// links; rejects anything else (returns null) so we
  * never render a `javascript:` or otherwise unsafe href.
+ *
+ * Note on file:// — a local-file link (e.g. file:///Users/you/doc.pdf) is
+ * accepted so the calendar can open a file when it is itself opened from a
+ * local/localhost origin. Browsers block navigating to file:// from an https
+ * page, so on the deployed (https) site clicking such a link may do nothing;
+ * the UI surfaces this caveat where these links are entered/shown.
  */
 export function normalizeUrl(raw: string): string | null {
   const s = raw.trim();
@@ -58,7 +64,7 @@ export function normalizeUrl(raw: string): string | null {
   const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`;
   try {
     const u = new URL(withScheme);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (u.protocol !== "http:" && u.protocol !== "https:" && u.protocol !== "file:") return null;
     return u.toString();
   } catch {
     return null;
@@ -83,7 +89,13 @@ function coerceLinks(raw: unknown): EventLink[] | undefined {
 /** A short human label derived from a URL's host (fallback when none given). */
 export function hostLabel(url: string): string {
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    const u = new URL(url);
+    // file:// URLs have no hostname — label them with the file name instead.
+    if (u.protocol === "file:") {
+      const name = decodeURIComponent(u.pathname.split("/").filter(Boolean).pop() || "");
+      return name || "Local file";
+    }
+    return u.hostname.replace(/^www\./, "");
   } catch {
     return "Link";
   }
