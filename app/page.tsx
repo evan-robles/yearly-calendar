@@ -143,9 +143,9 @@ export default function HomePage() {
   };
 
   // Keyboard navigation:
-  //  • plain ←/→          → previous/next YEAR (same as the ◂/▸ buttons)
-  //  • Shift + ←/→        → move the focused DAY by ∓1 day
-  //  • Shift + ↑/↓        → move the focused DAY by ∓1 week
+  //  • plain ←/→          → move the focused DAY by ∓1 day
+  //  • plain ↑/↓          → move the focused DAY by ∓1 week
+  //  • Shift + ←/→        → switch calendars (previous/next YEAR)
   //  • Enter              → open the focused day's drawer
   // Ignored while typing in a field or when any modal/drawer is open.
   useEffect(() => {
@@ -169,27 +169,25 @@ export default function HomePage() {
         e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown";
       if (!isArrow) return;
 
-      // Shift + arrow → move the focused day (day-granularity navigation).
+      // Shift + ←/→ → switch calendars (previous/next year). ↑/↓ + Shift: no-op.
       if (e.shiftKey) {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
         e.preventDefault();
-        // Seed focus on first use: today if it's in the shown year, else Jan 1.
-        const base =
-          focusedDate ?? (TODAY.slice(0, 4) === String(year) ? TODAY : `${year}-01-01`);
-        const dayDelta =
-          e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" ? -7 : 7;
-        const next = addDaysISO(base, dayDelta);
-        // Keep the focused day visible: page the year if it crossed a boundary.
-        const nextYear = Number(next.slice(0, 4));
-        if (nextYear !== year) goYear(nextYear - year);
-        setFocusedDate(next);
+        goYear(e.key === "ArrowRight" ? 1 : -1);
         return;
       }
 
-      // Plain ←/→ → previous/next year (↑/↓ without Shift do nothing).
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        e.preventDefault();
-        goYear(e.key === "ArrowRight" ? 1 : -1);
-      }
+      // Plain arrow → move the focused day (day-granularity navigation).
+      e.preventDefault();
+      // Seed focus on first use: today if it's in the shown year, else Jan 1.
+      const base = focusedDate ?? (TODAY.slice(0, 4) === String(year) ? TODAY : `${year}-01-01`);
+      const dayDelta =
+        e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" ? -7 : 7;
+      const next = addDaysISO(base, dayDelta);
+      // Keep the focused day visible: page the year if it crossed a boundary.
+      const nextYear = Number(next.slice(0, 4));
+      if (nextYear !== year) goYear(nextYear - year);
+      setFocusedDate(next);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

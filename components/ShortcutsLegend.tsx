@@ -10,9 +10,9 @@ interface Shortcut {
 }
 
 const SHORTCUTS: Shortcut[] = [
-  { keys: ["←", "→"], label: "Previous / next year" },
-  { keys: ["⇧", "←", "→"], label: "Focus previous / next day" },
-  { keys: ["⇧", "↑", "↓"], label: "Focus previous / next week" },
+  { keys: ["←", "→"], label: "Focus previous / next day" },
+  { keys: ["↑", "↓"], label: "Focus previous / next week" },
+  { keys: ["⇧", "←", "→"], label: "Switch calendars (previous / next year)" },
   { keys: ["↵"], label: "Open the focused day" },
   { keys: ["Esc"], label: "Close drawer / dialog" },
 ];
@@ -57,7 +57,7 @@ export function ShortcutsLegend() {
             ))}
           </ul>
           <p className="mt-1 border-t border-line px-2 py-2 text-[11px] leading-snug text-muted">
-            Hold <kbd className="inline-flex h-4 items-center rounded border border-line bg-canvas px-1 font-mono text-[10px] text-ink/70">⇧</kbd> and an arrow to move the highlighted day, then press <kbd className="inline-flex h-4 items-center rounded border border-line bg-canvas px-1 font-mono text-[10px] text-ink/70">↵</kbd> to open it.
+            Use the arrow keys to move the highlighted day, then press <kbd className="inline-flex h-4 items-center rounded border border-line bg-canvas px-1 font-mono text-[10px] text-ink/70">↵</kbd> to open it. Hold <kbd className="inline-flex h-4 items-center rounded border border-line bg-canvas px-1 font-mono text-[10px] text-ink/70">⇧</kbd> with <kbd className="inline-flex h-4 items-center rounded border border-line bg-canvas px-1 font-mono text-[10px] text-ink/70">←</kbd><kbd className="inline-flex h-4 items-center rounded border border-line bg-canvas px-1 font-mono text-[10px] text-ink/70">→</kbd> to switch calendars.
           </p>
         </div>
       )}
