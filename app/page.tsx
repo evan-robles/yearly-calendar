@@ -6,11 +6,12 @@ import { useEvents } from "@/lib/useEvents";
 import { useLabels } from "@/lib/useLabels";
 import { useReminders } from "@/lib/useReminders";
 import { useGistSync } from "@/lib/useGistSync";
-import { todayISO, startOfYearISO, endOfYearISO } from "@/lib/date-utils";
+import { todayISO, startOfYearISO, endOfYearISO, addDaysISO } from "@/lib/date-utils";
 import { expandToMap, expandEvent } from "@/lib/recurrence";
 import type { CategoryId } from "@/lib/types";
 import { YearCalendar } from "@/components/YearCalendar";
 import { CategoryLegend } from "@/components/CategoryLegend";
+import { ShortcutsLegend } from "@/components/ShortcutsLegend";
 import { DayDrawer } from "@/components/DayDrawer";
 import { BulkDeleteDialog } from "@/components/BulkDeleteDialog";
 import { BackupMenu } from "@/components/BackupMenu";
@@ -50,6 +51,9 @@ export default function HomePage() {
   const [windowStart, setWindowStart] = useState<number>(THIS_YEAR);
   const [year, setYear] = useState<number>(THIS_YEAR);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Keyboard-focused day (Shift+arrow navigation). Distinct from selectedDate,
+  // which opens the drawer. Enter promotes focus → selection.
+  const [focusedDate, setFocusedDate] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
@@ -138,22 +142,69 @@ export default function HomePage() {
     });
   };
 
-  // Left/Right arrow keys move to the previous/next year (same as the ◂/▸
-  // buttons). Ignored while typing in a field or when any modal/drawer is open.
+  // Keyboard navigation:
+  //  • plain ←/→          → previous/next YEAR (same as the ◂/▸ buttons)
+  //  • Shift + ←/→        → move the focused DAY by ∓1 day
+  //  • Shift + ↑/↓        → move the focused DAY by ∓1 week
+  //  • Enter              → open the focused day's drawer
+  // Ignored while typing in a field or when any modal/drawer is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       const tag = el?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) return;
+      // Any open modal/drawer owns the keyboard (they handle their own Esc).
       if (selectedDate || bulkDeleteOpen || resetConfirmOpen || labelManagerOpen) return;
-      e.preventDefault();
-      goYear(e.key === "ArrowRight" ? 1 : -1);
+
+      // Enter opens the currently focused day.
+      if (e.key === "Enter") {
+        if (!focusedDate) return;
+        e.preventDefault();
+        setSelectedDate(focusedDate);
+        return;
+      }
+
+      const isArrow =
+        e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown";
+      if (!isArrow) return;
+
+      // Shift + arrow → move the focused day (day-granularity navigation).
+      if (e.shiftKey) {
+        e.preventDefault();
+        // Seed focus on first use: today if it's in the shown year, else Jan 1.
+        const base =
+          focusedDate ?? (TODAY.slice(0, 4) === String(year) ? TODAY : `${year}-01-01`);
+        const dayDelta =
+          e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" ? -7 : 7;
+        const next = addDaysISO(base, dayDelta);
+        // Keep the focused day visible: page the year if it crossed a boundary.
+        const nextYear = Number(next.slice(0, 4));
+        if (nextYear !== year) goYear(nextYear - year);
+        setFocusedDate(next);
+        return;
+      }
+
+      // Plain ←/→ → previous/next year (↑/↓ without Shift do nothing).
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        goYear(e.key === "ArrowRight" ? 1 : -1);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedDate, bulkDeleteOpen, resetConfirmOpen, labelManagerOpen]);
+  }, [selectedDate, bulkDeleteOpen, resetConfirmOpen, labelManagerOpen, focusedDate, year]);
+
+  // Keep the focused cell scrolled into view as it moves (mirrors the today-
+  // scroll). Only scrolls when focus actually changed, and skips smooth-scroll
+  // for reduced-motion users.
+  useEffect(() => {
+    if (!focusedDate) return;
+    const el = document.querySelector('[data-focused="true"]');
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest", inline: "nearest" });
+  }, [focusedDate]);
 
   // Scroll today's cell into view once, after first hydration, but only when
   // we're on the year that actually contains today.
@@ -293,7 +344,8 @@ export default function HomePage() {
             <CalendarClock className="h-3.5 w-3.5" />
             Today
           </button>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <ShortcutsLegend />
             <CategoryLegend labels={lbl.labels} onManage={() => setLabelManagerOpen(true)} />
           </div>
         </div>
@@ -316,8 +368,12 @@ export default function HomePage() {
             year={year}
             occurrencesByDate={occurrencesByDate}
             getLabel={lbl.getLabel}
-            onSelectDay={setSelectedDate}
+            onSelectDay={(iso) => {
+              setFocusedDate(iso); // clicking a day also moves the keyboard focus there
+              setSelectedDate(iso);
+            }}
             today={TODAY}
+            focusedDate={focusedDate}
           />
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">

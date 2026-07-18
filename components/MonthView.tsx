@@ -12,9 +12,11 @@ interface MonthProps {
   getLabel: (id: string) => Label;
   onSelectDay: (isoDate: string) => void;
   today: string;
+  /** ISO date of the keyboard-focused day, if any (Shift+arrow navigation). */
+  focusedDate?: string | null;
 }
 
-export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSelectDay, today }: MonthProps) {
+export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSelectDay, today, focusedDate }: MonthProps) {
   const grid = monthGrid(year, monthIndex);
   const isCurrentMonth = today.slice(0, 7) === `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
 
@@ -64,6 +66,7 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
 
           const isToday = iso === today;
           const isPast = iso < today;
+          const isFocused = iso === focusedDate;
 
           // Style precedence: today (brand) > active events (soft category tint)
           // > past (slight gray) > default.
@@ -81,12 +84,14 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
               onClick={() => onSelectDay(iso)}
               style={tintStyle}
               data-today={isToday ? "true" : undefined}
+              data-focused={isFocused ? "true" : undefined}
+              aria-current={isFocused ? "date" : undefined}
               className={
                 "group relative aspect-[5/4] min-w-0 cursor-pointer overflow-hidden border-b border-r border-line/50 p-1 text-left transition-colors last:border-r-0 " +
                 (isToday
                   ? "ring-2 ring-inset ring-brand hover:brightness-[0.97]"
-                  : isPast
-                  ? "hover:bg-canvas"
+                  : isFocused
+                  ? "z-10 ring-2 ring-inset ring-brand/70 hover:bg-canvas"
                   : "hover:bg-canvas")
               }
             >
