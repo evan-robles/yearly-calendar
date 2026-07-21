@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, RotateCcw, Trash2, ChevronLeft, ChevronRight, CalendarClock, Tag } from "lucide-react";
+import { CalendarDays, RotateCcw, Trash2, ChevronLeft, ChevronRight, CalendarClock, Tag, PanelRight } from "lucide-react";
 import { useEvents } from "@/lib/useEvents";
 import { useLabels } from "@/lib/useLabels";
 import { useReminders } from "@/lib/useReminders";
@@ -21,6 +21,8 @@ import { SyncMenu } from "@/components/SyncMenu";
 import { FilterBar } from "@/components/FilterBar";
 import { LabelManager } from "@/components/LabelManager";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { DocPanel } from "@/components/DocPanel";
+import { useDocPanel } from "@/lib/useDocPanel";
 
 // The year of "today", computed at module load. Used only to seed the initial
 // view and to highlight today — the visible window is now user-navigable.
@@ -45,6 +47,7 @@ export default function HomePage() {
     },
   });
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
+  const docPanel = useDocPanel();
 
   // Sliding 4-year window. `windowStart` is the first visible year; the user can
   // page it backward/forward or jump back to "today".
@@ -241,7 +244,10 @@ export default function HomePage() {
     <>
       {/* Sticky frosted header */}
       <header className="glass sticky top-0 z-20 border-b border-line/70">
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <div
+          className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-4 py-3 transition-[padding] duration-200 sm:px-6 lg:px-8"
+          style={docPanel.open ? { paddingRight: `min(${docPanel.width}px, 92vw)` } : undefined}
+        >
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white shadow-card">
               <CalendarDays className="h-5 w-5" />
@@ -265,6 +271,17 @@ export default function HomePage() {
               onTest={reminders.testNotification}
             />
             <SyncMenu sync={sync} />
+            <button
+              onClick={docPanel.toggle}
+              className={
+                btnBase + (docPanel.open ? " border-brand/50 bg-brand-soft/50 text-brand" : "")
+              }
+              title="Show a Google Doc beside the calendar"
+              aria-pressed={docPanel.open}
+            >
+              <PanelRight className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Doc</span>
+            </button>
             <button onClick={() => setLabelManagerOpen(true)} className={btnBase} title="Create and manage labels">
               <Tag className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Labels</span>
@@ -299,7 +316,10 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+      <main
+        className="mx-auto max-w-[1400px] px-4 py-6 transition-[padding] duration-200 sm:px-6 lg:px-8"
+        style={docPanel.open ? { paddingRight: `min(${docPanel.width}px, 92vw)` } : undefined}
+      >
         {/* Year nav with paging */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 rounded-xl border border-line bg-surface p-1 shadow-soft">
@@ -440,6 +460,17 @@ export default function HomePage() {
         />
       )}
       </main>
+
+      {/* Google Doc side panel (read-only embed + edit link) */}
+      <DocPanel
+        open={docPanel.open}
+        url={docPanel.url}
+        doc={docPanel.doc}
+        width={docPanel.width}
+        onSetUrl={docPanel.setUrl}
+        onSetWidth={docPanel.setWidth}
+        onClose={docPanel.close}
+      />
     </>
   );
 }
