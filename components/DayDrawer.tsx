@@ -67,7 +67,7 @@ export function DayDrawer({
   }, [date]);
 
   return (
-    <div className="fixed inset-0 z-30 flex">
+    <div className="fixed inset-0 z-40 flex">
       {/* Backdrop */}
       <div
         className="flex-1 animate-fade-in bg-ink/40 backdrop-blur-[2px]"
