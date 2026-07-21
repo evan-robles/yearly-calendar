@@ -17,7 +17,10 @@ interface Props {
 
 export function YearCalendar({ year, occurrencesByDate, getLabel, onSelectDay, today, focusedDate }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+    <div
+      className="grid gap-6"
+      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(15.5rem, 1fr))" }}
+    >
       {MONTH_NAMES.map((_name, monthIdx) => (
         <MonthView
           key={monthIdx}

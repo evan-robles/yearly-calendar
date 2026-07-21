@@ -33,12 +33,12 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
         )}
       </header>
 
-      {/* Day-of-week header */}
+      {/* Day-of-week header — single letter keeps it legible at any cell width
+          (never runs together when the grid narrows, e.g. with the doc panel open). */}
       <div className="grid grid-cols-7 border-y border-line/70 bg-canvas/60 text-[10px] font-semibold uppercase tracking-wider text-muted">
         {DAY_HEADERS_MON_FIRST.map((d) => (
-          <div key={d} className="px-1.5 py-1.5 text-center">
+          <div key={d} className="py-1.5 text-center" title={d}>
             {d.charAt(0)}
-            <span className="hidden sm:inline">{d.slice(1)}</span>
           </div>
         ))}
       </div>
@@ -141,14 +141,19 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
                   );
                 }
                 if (ordered.length === 0) return null;
+                // Cap the visible dots so a busy day stays one compact row even in
+                // a narrow cell (e.g. with the doc panel open); overflow shows +N.
+                const MAX_DOTS = 5;
+                const shown = ordered.slice(0, MAX_DOTS);
+                const overflow = ordered.length - shown.length;
                 return (
-                  <div className="mt-1 flex flex-wrap items-center gap-1">
-                    {ordered.map((o) => {
+                  <div className="mt-1 flex items-center gap-1">
+                    {shown.map((o) => {
                       const cat = getLabel(o.event.category);
                       return (
                         <span
                           key={o.event.id + o.date}
-                          className="h-2 w-2 rounded-full"
+                          className="h-2 w-2 shrink-0 rounded-full"
                           style={
                             o.completed
                               ? { border: `1.5px solid ${cat.accent}`, opacity: 0.5 }
@@ -158,7 +163,8 @@ export function MonthView({ year, monthIndex, occurrencesByDate, getLabel, onSel
                         />
                       );
                     })}
-                    <span className="text-[9px] font-semibold text-muted">{ordered.length}</span>
+                    {overflow > 0 && <span className="text-[9px] font-semibold text-muted">+{overflow}</span>}
+                    <span className="ml-auto text-[9px] font-semibold text-muted">{ordered.length}</span>
                   </div>
                 );
               })()}
